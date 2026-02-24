@@ -307,28 +307,31 @@ const questions = [
     }
 ];
 
-async function seed() {
-    try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mindtrap');
-        console.log('Connected to MongoDB');
-
-        await Question.deleteMany({});
-        console.log('Cleared existing questions');
-
-        await Question.insertMany(questions);
-        console.log(`Seeded ${questions.length} questions`);
-
-        // Create admin default (for reference)
-        console.log(`\nAdmin credentials:`);
-        console.log(`  Username: ${process.env.ADMIN_USERNAME || 'admin'}`);
-        console.log(`  Password: ${process.env.ADMIN_PASSWORD || 'mindtrap2026'}`);
-
-        await mongoose.disconnect();
-        console.log('Done!');
-    } catch (err) {
-        console.error('Seed error:', err);
-        process.exit(1);
+export async function seedQuestions() {
+    const existing = await Question.countDocuments();
+    if (existing > 0) {
+        console.log(`✅ ${existing} questions already in database, skipping seed`);
+        return;
     }
+    await Question.insertMany(questions);
+    console.log(`✅ Seeded ${questions.length} questions`);
 }
 
-seed();
+// CLI mode: run directly with `node src/seed.js`
+const isMainModule = process.argv[1]?.includes('seed.js');
+if (isMainModule) {
+    (async () => {
+        try {
+            const { MongoMemoryServer } = await import('mongodb-memory-server');
+            const mongod = await MongoMemoryServer.create();
+            await mongoose.connect(mongod.getUri());
+            await seedQuestions();
+            await mongoose.disconnect();
+            await mongod.stop();
+            console.log('Done!');
+        } catch (err) {
+            console.error('Seed error:', err);
+            process.exit(1);
+        }
+    })();
+}

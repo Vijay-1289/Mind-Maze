@@ -6,10 +6,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import playerRoutes from './routes/playerRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import setupSocket from './socket/socketHandler.js';
+import { seedQuestions } from './seed.js';
 
 dotenv.config();
 
@@ -53,11 +55,22 @@ const PORT = process.env.PORT || 3001;
 
 async function start() {
     try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mindtrap');
-        console.log('✅ Connected to MongoDB');
+        // Use in-memory MongoDB (no external MongoDB needed)
+        console.log('⏳ Starting in-memory MongoDB...');
+        const mongod = await MongoMemoryServer.create();
+        const uri = mongod.getUri();
+        console.log('✅ In-memory MongoDB started');
+
+        await mongoose.connect(uri);
+        console.log('✅ Connected to MongoDB (in-memory)');
+
+        // Auto-seed questions on startup
+        await seedQuestions();
 
         httpServer.listen(PORT, () => {
             console.log(`🚀 MindTrap server running on port ${PORT}`);
+            console.log(`🎮 Frontend: http://localhost:5173`);
+            console.log(`🔐 Admin: http://localhost:5173/admin`);
         });
     } catch (err) {
         console.error('❌ Failed to start server:', err);

@@ -27,7 +27,7 @@ export default function HUD({ player }) {
             </div>
             <div className="hud-item">
                 <span className="label">DEPTH</span>
-                <span className="value">{player.depth || 0}/10</span>
+                <span className="value">{player.depth || 0}/30</span>
             </div>
             <div className="hud-item">
                 <span className="label">MISTAKES</span>

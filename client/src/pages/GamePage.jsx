@@ -123,7 +123,7 @@ export default function GamePage() {
                 shadows
                 camera={{ fov: 75, near: 0.1, far: 200, position: [0, 2, 2] }}
                 gl={{ antialias: true, alpha: false }}
-                onCreated={({ gl }) => { gl.setClearColor('#0a0a0f'); }}
+                onCreated={({ gl }) => { gl.setClearColor('#e8f5e9'); }}
             >
                 <MazeScene
                     maze={maze}
