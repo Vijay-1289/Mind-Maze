@@ -7,6 +7,13 @@ export default function VictoryOverlay({ player }) {
     const mins = Math.floor(timeElapsed / 60);
     const secs = timeElapsed % 60;
 
+    const handleExit = () => {
+        sessionStorage.removeItem('sessionId');
+        sessionStorage.removeItem('playerState');
+        sessionStorage.removeItem('mazeData');
+        window.location.href = '/';
+    };
+
     return (
         <motion.div className="victory-overlay"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -35,6 +42,14 @@ export default function VictoryOverlay({ player }) {
                     <div className="lbl">MISTAKES</div>
                 </div>
             </motion.div>
+
+            <motion.button
+                className="btn btn-primary"
+                style={{ marginTop: '2rem', fontSize: '1.2rem', padding: '10px 30px' }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }}
+                onClick={handleExit}>
+                EXIT MAZE
+            </motion.button>
         </motion.div>
     );
 }

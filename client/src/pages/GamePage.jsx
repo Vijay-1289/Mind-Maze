@@ -5,7 +5,6 @@ import MazeScene from '../game/MazeScene';
 import HUD from '../components/HUD';
 import DeadEndOverlay from '../components/DeadEndOverlay';
 import VictoryOverlay from '../components/VictoryOverlay';
-import Leaderboard from '../components/Leaderboard';
 import { submitAnswer, reportTabSwitch, getGameState, getAllQuestions } from '../api';
 import { getSocket } from '../socket';
 
@@ -165,8 +164,6 @@ export default function GamePage() {
             }}>
                 CLICK TO LOOK • WASD TO MOVE • WALK INTO A PATH TO ANSWER
             </div>
-
-            <Leaderboard sessionId={sessionId} />
         </div>
     );
 }
