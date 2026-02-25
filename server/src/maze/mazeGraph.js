@@ -61,6 +61,8 @@ export function createMazeGraph(seed = 12345) {
     cx = initRes.cx;
     cz = initRes.cz;
 
+    let previousCorrectIndex = -1;
+
     for (let q = 1; q <= TOTAL_QUESTIONS; q++) {
         const qId = `q${q}`;
 
@@ -73,8 +75,13 @@ export function createMazeGraph(seed = 12345) {
         cx = qx; cz = qz;
 
         // 3. Make three paths from this junction
-        const correctPathIdx = Math.floor(rng() * 3);
+        // Prevent consecutive questions from having the same physical path index answer
+        let correctPathIdx = Math.floor(rng() * 3);
+        if (correctPathIdx === previousCorrectIndex) {
+            correctPathIdx = (correctPathIdx + 1) % 3;
+        }
         correctPaths[qId] = correctPathIdx;
+        previousCorrectIndex = correctPathIdx;
 
         let nextMainId = qId, nextMainX = cx, nextMainZ = cz;
 
@@ -88,32 +95,17 @@ export function createMazeGraph(seed = 12345) {
             addNode(pId, px, pz, { depth: q, isQuestion: false, type: 'corridor' });
             edges.push({ from: qId, to: pId, pathIndex: p });
 
-            // Build dynamic snaking profiles for each lane to ensure a turn out-of-sight
-            // and guarantee absolute visual hiding before dead end
+            // Hardcoded rigid mathematical profiles that guarantee NO overlaps
             let profile = [];
-
             if (p === 0) {
-                // LEFT PATH: West -> North -> East -> North
-                const w1 = 3 + Math.floor(rng() * 4); // West 3-6
-                const n1 = 4 + Math.floor(rng() * 3); // North 4-6
-                const e1 = 2 + Math.floor(rng() * 2); // East 2-3
-                const n2 = 2 + Math.floor(rng() * 3); // North 2-4
-                profile = [[3, w1], [0, n1], [1, e1], [0, n2]];
+                // LEFT PATH: West 4 (from -1), North 5, East 2, North 5
+                profile = [[3, 4], [0, 5], [1, 2], [0, 5]];
             } else if (p === 1) {
-                // CENTER PATH: North -> West or East -> North -> Back Center -> North
-                const n1 = 3 + Math.floor(rng() * 3); // North 3-5
-                const sideDir = rng() < 0.5 ? 3 : 1;  // West or East
-                const s1 = 3 + Math.floor(rng() * 3); // Side 3-5
-                const n2 = 3 + Math.floor(rng() * 3); // North 3-5
-                const oppDir = sideDir === 3 ? 1 : 3; // Opposite
-                profile = [[0, n1], [sideDir, s1], [0, n2], [oppDir, s1], [0, 2]];
+                // CENTER PATH: North 1 (from -1), West 2, North 4, East 4, North 4
+                profile = [[0, 1], [3, 2], [0, 4], [1, 4], [0, 4]];
             } else {
-                // RIGHT PATH: East -> North -> West -> North
-                const e1 = 3 + Math.floor(rng() * 4); // East 3-6
-                const n1 = 4 + Math.floor(rng() * 3); // North 4-6
-                const w1 = 2 + Math.floor(rng() * 2); // West 2-3
-                const n2 = 2 + Math.floor(rng() * 3); // North 2-4
-                profile = [[1, e1], [0, n1], [3, w1], [0, n2]];
+                // RIGHT PATH: East 4 (from 1), North 5, West 2, North 5
+                profile = [[1, 4], [0, 5], [3, 2], [0, 5]];
             }
 
             const pRes = drawPath(pId, px, pz, profile, q);
@@ -121,7 +113,13 @@ export function createMazeGraph(seed = 12345) {
             if (p === correctPathIdx) {
                 if (q < TOTAL_QUESTIONS) {
                     // This path is correct, add a connector straight North so next question is cleanly separated
-                    const connRes = drawPath(pRes.lastId, pRes.cx, pRes.cz, [[0, 4]], q);
+                    // Needs to return perfectly to Center (X=0) and North 4
+                    let connProfile = [];
+                    if (p === 0) connProfile = [[0, 4], [1, 3], [0, 4]]; // Left is at X=-3
+                    if (p === 1) connProfile = [[0, 4], [3, 2], [0, 4]]; // Center is at X=2
+                    if (p === 2) connProfile = [[0, 4], [3, 3], [0, 4]]; // Right is at X=3
+
+                    const connRes = drawPath(pRes.lastId, pRes.cx, pRes.cz, connProfile, q);
                     nextMainId = connRes.lastId;
                     nextMainX = connRes.cx;
                     nextMainZ = connRes.cz;
@@ -136,7 +134,7 @@ export function createMazeGraph(seed = 12345) {
                 // Wrong path -> it naturally ends at the last block of its profile.
                 // We add a 'deadend' type node directly into the wall they are facing,
                 // making it visibly blocked.
-                const finalDir = pRes.lastDir; // The direction the player is looking at the end of the profile
+                const finalDir = pRes.lastDir;
                 const dx = pRes.cx + DX[finalDir];
                 const dz = pRes.cz + DZ[finalDir];
 
