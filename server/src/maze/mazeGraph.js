@@ -1,18 +1,11 @@
-// MindTrap Maze — Clean S-shaped winding maze with 30 questions
-//
-// The maze follows a clear serpentine (S-shaped) pattern:
-//   Go north several cells → turn east → go east → turn south →
-//   Go south several cells → turn east → go east → turn north → repeat
-//
-// Between questions: 4-6 corridor cells of exploration with turns.
-// Wrong paths: 3-4 cells before dead end.
-// Correct paths: continue into next exploration section.
-//
-// All connections are strictly cardinal (horizontal/vertical).
+// MindTrap Maze — Procedurally generated 30-question maze graph
+// The maze is a directed graph where each question node has 3 paths:
+// 1 correct (leads deeper) and 2 dead ends.
+// The maze snakes left-right creating a more interesting layout.
 
 const WALL_HEIGHT = 3.5;
 const CORRIDOR_WIDTH = 4;
-const SEGMENT_LENGTH = 4;
+const SEGMENT_LENGTH = 4;  // matches CELL size in MazeScene
 
 // Seeded random number generator
 function seededRandom(seed) {
@@ -28,166 +21,102 @@ export function createMazeGraph(seed = 12345) {
     const rng = seededRandom(seed);
     const nodes = {};
     const edges = [];
-    const occupied = new Set();
-    const correctPaths = {}; // Maps questionId -> correct path index
     const TOTAL_QUESTIONS = 30;
+    const correctPaths = {}; // Maps questionId -> correct path index
 
-    function key(gx, gz) { return `${gx},${gz}`; }
-    function isFree(gx, gz) { return !occupied.has(key(gx, gz)); }
-    function addNode(id, gx, gz, props) {
-        occupied.add(key(gx, gz));
-        nodes[id] = { id, x: gx * SEGMENT_LENGTH, z: gz * SEGMENT_LENGTH, ...props };
-    }
+    // Starting position
+    let curX = 0;
+    let curZ = 0;
 
-    // Directions: 0=north(-z), 1=east(+x), 2=south(+z), 3=west(-x)
-    const DX = [0, 1, 0, -1];
-    const DZ = [-1, 0, 1, 0];
-    function leftOf(d) { return (d + 3) % 4; }
-    function rightOf(d) { return (d + 1) % 4; }
+    // Add start node
+    nodes['start'] = {
+        id: 'start', x: curX * SEGMENT_LENGTH, z: curZ * SEGMENT_LENGTH,
+        depth: 0, isQuestion: false, type: 'corridor'
+    };
 
-    // Place a chain of corridor nodes going in direction `dir` from (sx,sz)
-    // Returns { lastId, cx, cz }
-    function placeChain(startId, sx, sz, dir, count, depthVal) {
-        let lastId = startId, cx = sx, cz = sz;
-        for (let i = 0; i < count; i++) {
-            cx += DX[dir];
-            cz += DZ[dir];
-            if (!isFree(cx, cz)) break;
-            const id = `cor_${cx}_${cz}`;
-            addNode(id, cx, cz, { depth: depthVal, isQuestion: false, type: 'corridor' });
-            edges.push({ from: lastId, to: id });
-            lastId = id;
-        }
-        return { lastId, cx, cz };
-    }
-
-    // ─── Build the S-shaped maze ───
-
-    let cx = 0, cz = 0;
-    addNode('start', cx, cz, { depth: 0, isQuestion: false, type: 'corridor' });
-    let lastId = 'start';
-
-    // Main direction alternates: north, then south (serpentine)
-    // Lateral shift is always east (+x) to create the S-shape
-    let vertDir = 0; // 0 = north (-z), 2 = south (+z)
+    // Move forward to first question
+    curZ -= 1;
 
     for (let q = 1; q <= TOTAL_QUESTIONS; q++) {
-        // ═══ EXPLORATION: Go vertical 3-4 cells ═══
-        const vertLen = 3 + (q % 2); // alternates 3, 4
-        const vertResult = placeChain(lastId, cx, cz, vertDir, vertLen, q - 1);
-        lastId = vertResult.lastId;
-        cx = vertResult.cx;
-        cz = vertResult.cz;
+        const qId = `q${q}`;
+        const depth = q;
 
-        // ═══ TURN: Go east 1-2 cells (lateral shift) ═══
-        const latLen = 1 + (q % 3 === 0 ? 1 : 0);
-        const latResult = placeChain(lastId, cx, cz, 1, latLen, q - 1); // east
-        lastId = latResult.lastId;
-        cx = latResult.cx;
-        cz = latResult.cz;
+        // Place question node
+        nodes[qId] = {
+            id: qId, x: curX * SEGMENT_LENGTH, z: curZ * SEGMENT_LENGTH,
+            depth: depth - 1, isQuestion: true, type: 'junction', pathCount: 3
+        };
 
-        // ═══ QUESTION JUNCTION ═══
-        // Place question 1 cell forward in vertical direction
-        const qx = cx + DX[vertDir];
-        const qz = cz + DZ[vertDir];
-        if (!isFree(qx, qz)) {
-            // Fallback: place in current direction
-            cx += DX[1]; cz += DZ[1]; // go east
-        } else {
-            cx = qx; cz = qz;
+        // Connect from previous node
+        if (q === 1) {
+            edges.push({ from: 'start', to: qId });
         }
 
-        const qId = `q${q}`;
-        addNode(qId, cx, cz, { depth: q - 1, isQuestion: true, type: 'junction', pathCount: 3 });
-        edges.push({ from: lastId, to: qId });
-
-        // ═══ THREE BRANCHING PATHS ═══
-        // Paths go: left, forward, right relative to approach direction
-        const approachDir = vertDir; // player approaches from this direction
+        // Determine which direction is "correct" and create 3 paths
         // RANDOMIZE the correct path per player using the seed!
-        const correctIdx = Math.floor(rng() * 3);
-        correctPaths[qId] = correctIdx;
-        const pathDirs = [leftOf(approachDir), approachDir, rightOf(approachDir)];
+        const correctPathIdx = Math.floor(rng() * 3);
+        correctPaths[qId] = correctPathIdx;
+
+        // 3 path positions: left(-1), center(0), right(+1) relative to current direction
+        const pathOffsets = [-1, 0, 1];
 
         for (let p = 0; p < 3; p++) {
-            const pDir = pathDirs[p];
-            const px = cx + DX[pDir];
-            const pz = cz + DZ[pDir];
-            if (!isFree(px, pz)) continue;
+            const pathNodeId = `q${q}_p${p}`;
+            const pathX = curX + pathOffsets[p];
+            const pathZ = curZ - 1;
 
-            const pId = `q${q}_p${p}`;
-            addNode(pId, px, pz, { depth: q, isQuestion: false, type: 'corridor' });
-            edges.push({ from: qId, to: pId, pathIndex: p });
+            nodes[pathNodeId] = {
+                id: pathNodeId,
+                x: pathX * SEGMENT_LENGTH,
+                z: pathZ * SEGMENT_LENGTH,
+                depth, isQuestion: false,
+                type: 'corridor'
+            };
+            edges.push({ from: qId, to: pathNodeId, pathIndex: p });
 
-            if (p === correctIdx) {
-                // ═══ CORRECT PATH: 2-3 more corridor cells ═══
-                const corLen = 2 + (q % 2);
-                const corResult = placeChain(pId, px, pz, pDir, corLen, q);
-
+            if (p === correctPathIdx) {
+                // Correct path — leads to next question or victory
                 if (q < TOTAL_QUESTIONS) {
-                    lastId = corResult.lastId;
-                    cx = corResult.cx;
-                    cz = corResult.cz;
-                    // After correct path: flip vertical direction for S-shape
-                    if (q % 5 === 0) vertDir = vertDir === 0 ? 2 : 0;
+                    // Add a connector corridor then next question
+                    const connId = `q${q}_conn`;
+                    const connZ = pathZ - 1;
+                    nodes[connId] = {
+                        id: connId,
+                        x: pathX * SEGMENT_LENGTH,
+                        z: connZ * SEGMENT_LENGTH,
+                        depth, isQuestion: false, type: 'corridor'
+                    };
+                    edges.push({ from: pathNodeId, to: connId });
+
+                    // Next question will be placed at the connector's position going forward
+                    curX = pathX;
+                    curZ = connZ - 1;
+
+                    // Connect connector to next question (will be added next iteration)
+                    const nextQId = `q${q + 1}`;
+                    // We'll create an edge from connector to next question
+                    edges.push({ from: connId, to: nextQId });
                 } else {
-                    // Victory node
-                    const vx = corResult.cx + DX[pDir];
-                    const vz = corResult.cz + DZ[pDir];
-                    if (isFree(vx, vz)) {
-                        addNode('victory', vx, vz, { depth: TOTAL_QUESTIONS, isQuestion: false, type: 'victory' });
-                        edges.push({ from: corResult.lastId, to: 'victory' });
-                    }
+                    // Last question — correct path leads to victory
+                    const victoryId = 'victory';
+                    nodes[victoryId] = {
+                        id: victoryId,
+                        x: pathX * SEGMENT_LENGTH,
+                        z: (pathZ - 1) * SEGMENT_LENGTH,
+                        depth: TOTAL_QUESTIONS, isQuestion: false, type: 'victory'
+                    };
+                    edges.push({ from: pathNodeId, to: victoryId });
                 }
             } else {
-                // ═══ WRONG PATH: Extended 6-8 winding cells → dead end ═══
-                let wDir = pDir;
-                let wLastId = pId, wx = px, wz = pz;
-
-                // We will create exactly 3 segments with 2 turns
-                const segmentLengths = [
-                    1 + Math.floor(rng() * 2), // 1-2 cells
-                    1 + Math.floor(rng() * 2), // 1-2 cells
-                    1 + Math.floor(rng() * 2)  // 1-2 cells
-                ];
-
-                for (let seg = 0; seg < segmentLengths.length; seg++) {
-                    const len = segmentLengths[seg];
-                    for (let s = 0; s < len; s++) {
-                        const nx = wx + DX[wDir], nz = wz + DZ[wDir];
-                        if (!isFree(nx, nz)) break; // Stop if wall hit
-                        const id = `q${q}_w${p}_seg${seg}_${s}`;
-                        addNode(id, nx, nz, { depth: q, isQuestion: false, type: 'corridor' });
-                        edges.push({ from: wLastId, to: id });
-                        wLastId = id; wx = nx; wz = nz;
-                    }
-
-                    // Turn at the end of the segment (except the last one)
-                    if (seg < segmentLengths.length - 1) {
-                        const turnLeft = rng() > 0.5;
-                        const turnDir = turnLeft ? leftOf(wDir) : rightOf(wDir);
-                        const tnx = wx + DX[turnDir], tnz = wz + DZ[turnDir];
-                        if (isFree(tnx, tnz)) {
-                            const tid = `q${q}_wt${p}_${seg}`;
-                            addNode(tid, tnx, tnz, { depth: q, isQuestion: false, type: 'corridor' });
-                            edges.push({ from: wLastId, to: tid });
-                            wLastId = tid; wx = tnx; wz = tnz; wDir = turnDir;
-                        } else {
-                            // If unable to turn without hitting wall, force stop extending
-                            break;
-                        }
-                    }
-                }
-
-                // Dead end
-                const deadX = wx + DX[wDir], deadZ = wz + DZ[wDir];
-                if (isFree(deadX, deadZ)) {
-                    const deadId = `q${q}_dead${p}`;
-                    addNode(deadId, deadX, deadZ, { depth: q, isQuestion: false, type: 'deadend' });
-                    edges.push({ from: wLastId, to: deadId });
-                } else {
-                    nodes[wLastId].type = 'deadend';
-                }
+                // Wrong path — leads to dead end
+                const deadId = `q${q}_dead${p}`;
+                nodes[deadId] = {
+                    id: deadId,
+                    x: pathX * SEGMENT_LENGTH,
+                    z: (pathZ - 1) * SEGMENT_LENGTH,
+                    depth, isQuestion: false, type: 'deadend'
+                };
+                edges.push({ from: pathNodeId, to: deadId });
             }
         }
     }
@@ -195,12 +124,14 @@ export function createMazeGraph(seed = 12345) {
     return { nodes, edges, WALL_HEIGHT, CORRIDOR_WIDTH, SEGMENT_LENGTH, correctPaths };
 }
 
+// Get all question node IDs in order
 export function getQuestionNodes() {
     const nodes = [];
     for (let i = 1; i <= 30; i++) nodes.push(`q${i}`);
     return nodes;
 }
 
+// Get difficulty for a question based on depth (1-5 scale over 30 questions)
 export function getDifficultyForDepth(depth) {
     if (depth <= 6) return 1;
     if (depth <= 12) return 2;

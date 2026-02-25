@@ -171,6 +171,7 @@ router.post('/answer', answerLimiter, checkSuspiciousActivity, async (req, res) 
         const result = validateAnswer(sessionId, nodeId, chosenPath);
 
         if (result.correct) {
+            const mazeData = createMazeGraph(player.questionSeed);
             // Update depth
             const node = mazeData.nodes[nodeId];
             player.depth = Math.max(player.depth, (node?.depth || 0) + 1);
