@@ -4,7 +4,7 @@ import Player from '../models/Player.js';
 import { assignQuestionsToPlayer, getQuestionForNode, validateAnswer } from '../services/questionEngine.js';
 import { checkSuspiciousActivity, checkAnswerTiming } from '../middleware/antiCheat.js';
 import { answerLimiter } from '../middleware/rateLimiter.js';
-import mazeData, { getQuestionNodes } from '../maze/mazeGraph.js';
+import { createMazeGraph, getQuestionNodes } from '../maze/mazeGraph.js';
 
 const router = Router();
 
@@ -20,12 +20,13 @@ router.post('/join', async (req, res) => {
         let player = await Player.findOne({ rollNumber, status: { $in: ['active', 'paused'] } });
         if (player) {
             // Resume existing session
+            const mazeData = createMazeGraph(player.questionSeed);
             const questionData = getQuestionForNode(player.sessionId, player.currentNode);
             return res.json({
                 sessionId: player.sessionId,
                 player: sanitizePlayer(player),
                 currentQuestion: questionData,
-                maze: getClientMaze(),
+                maze: getClientMaze(mazeData),
                 resumed: true
             });
         }
@@ -50,10 +51,12 @@ router.post('/join', async (req, res) => {
             io.to('admin').emit('player:joined', sanitizePlayerForAdmin(player));
         }
 
+        const mazeData = createMazeGraph(seed);
+
         res.json({
             sessionId,
             player: sanitizePlayer(player),
-            maze: getClientMaze(),
+            maze: getClientMaze(mazeData),
             resumed: false
         });
     } catch (err) {
@@ -73,13 +76,73 @@ router.get('/state/:sessionId', async (req, res) => {
             ? getQuestionForNode(player.sessionId, player.currentNode)
             : null;
 
+        const mazeData = createMazeGraph(player.questionSeed);
+
         res.json({
             player: sanitizePlayer(player),
             currentQuestion,
-            maze: getClientMaze()
+            maze: getClientMaze(mazeData)
         });
     } catch (err) {
         res.status(500).json({ error: 'Failed to get state' });
+    }
+});
+
+// Get all question texts + path labels for 3D display (read-only, no side effects)
+router.get('/questions/:sessionId', async (req, res) => {
+    try {
+        const player = await Player.findOne({ sessionId: req.params.sessionId });
+        if (!player) return res.status(404).json({ error: 'Session not found' });
+
+        const questionNodes = getQuestionNodes();
+        const allQuestions = {};
+        for (const nodeId of questionNodes) {
+            const q = getQuestionForNode(player.sessionId, nodeId);
+            if (q) allQuestions[nodeId] = q;
+        }
+
+        res.json({ questions: allQuestions });
+    } catch (err) {
+        console.error('Questions fetch error:', err);
+        res.status(500).json({ error: 'Failed to get questions' });
+    }
+});
+
+// Player reached a question node (walking into question zone)
+router.post('/reach', async (req, res) => {
+    try {
+        const { sessionId, nodeId } = req.body;
+        if (!sessionId || !nodeId) {
+            return res.status(400).json({ error: 'Missing sessionId or nodeId' });
+        }
+
+        const player = await Player.findOne({ sessionId });
+        if (!player) return res.status(404).json({ error: 'Session not found' });
+        if (player.status !== 'active') return res.status(403).json({ error: 'Game not active' });
+
+        // Check if it's a valid question node
+        const questionNodes = getQuestionNodes();
+        if (!questionNodes.includes(nodeId)) {
+            return res.json({ question: null });
+        }
+
+        // Check if already correctly answered
+        const alreadyCorrect = player.answeredNodes.find(a => a.nodeId === nodeId && a.correct);
+        if (alreadyCorrect) {
+            return res.json({ question: null, alreadyAnswered: true });
+        }
+
+        // Update current node
+        player.currentNode = nodeId;
+        player.lastActiveTime = new Date();
+        await player.save();
+
+        // Get the question for this node
+        const question = getQuestionForNode(sessionId, nodeId);
+        res.json({ question });
+    } catch (err) {
+        console.error('Reach error:', err);
+        res.status(500).json({ error: 'Failed to reach node' });
     }
 });
 
@@ -265,7 +328,7 @@ function sanitizePlayerForAdmin(p) {
 }
 
 // Helper: get client-safe maze data
-function getClientMaze() {
+function getClientMaze(mazeData) {
     // Send only structural data, no answer info
     const clientNodes = {};
     for (const [id, node] of Object.entries(mazeData.nodes)) {

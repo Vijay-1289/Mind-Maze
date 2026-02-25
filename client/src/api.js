@@ -23,6 +23,20 @@ export async function submitAnswer(sessionId, nodeId, chosenPath, timeTaken) {
     return res.json();
 }
 
+export async function reachNode(sessionId, nodeId) {
+    const res = await fetch(`${API}/api/player/reach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, nodeId })
+    });
+    return res.json();
+}
+
+export async function getAllQuestions(sessionId) {
+    const res = await fetch(`${API}/api/player/questions/${sessionId}`);
+    return res.json();
+}
+
 export async function reportTabSwitch(sessionId) {
     fetch(`${API}/api/player/tabswitch`, {
         method: 'POST',

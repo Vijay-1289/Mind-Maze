@@ -3,11 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import MazeScene from '../game/MazeScene';
 import HUD from '../components/HUD';
-import QuestionOverlay from '../components/QuestionOverlay';
 import DeadEndOverlay from '../components/DeadEndOverlay';
 import VictoryOverlay from '../components/VictoryOverlay';
 import Leaderboard from '../components/Leaderboard';
-import { submitAnswer, reportTabSwitch, getGameState } from '../api';
+import { submitAnswer, reportTabSwitch, getGameState, getAllQuestions } from '../api';
 import { getSocket } from '../socket';
 
 export default function GamePage() {
@@ -15,23 +14,28 @@ export default function GamePage() {
     const sessionId = sessionStorage.getItem('sessionId');
     const [maze, setMaze] = useState(null);
     const [player, setPlayer] = useState(null);
-    const [question, setQuestion] = useState(null);
+    const [questions, setQuestions] = useState({}); // nodeId -> questionData
     const [showDeadEnd, setShowDeadEnd] = useState(false);
     const [finished, setFinished] = useState(false);
-    const [locked, setLocked] = useState(false);
     const [paused, setPaused] = useState(false);
     const [kicked, setKicked] = useState(false);
-    const questionTimeRef = useRef(Date.now());
     const [winner, setWinner] = useState(null);
+    const answeredRef = useRef(new Set());
+    const loadingRef = useRef(new Set());
+    const questionTimeRef = useRef(Date.now());
 
+    // Load initial state
     useEffect(() => {
         if (!sessionId) { navigate('/'); return; }
         const mazeStr = sessionStorage.getItem('mazeData');
         const playerStr = sessionStorage.getItem('playerState');
-        const questionStr = sessionStorage.getItem('currentQuestion');
         if (mazeStr) setMaze(JSON.parse(mazeStr));
         if (playerStr) setPlayer(JSON.parse(playerStr));
-        if (questionStr) setQuestion(JSON.parse(questionStr));
+
+        // Fetch all question data in one call for 3D display
+        getAllQuestions(sessionId).then(data => {
+            if (data.questions) setQuestions(data.questions);
+        }).catch(err => console.error('Failed to load questions:', err));
     }, [sessionId, navigate]);
 
     // Socket events
@@ -60,26 +64,22 @@ export default function GamePage() {
         return () => document.removeEventListener('visibilitychange', handler);
     }, [sessionId]);
 
-    const handleReachQuestion = useCallback((nodeId) => {
-        if (locked) return;
-        // Fetch question from cached state or reload
-        getGameState(sessionId).then(data => {
-            if (data.currentQuestion) {
-                setQuestion(data.currentQuestion);
-                questionTimeRef.current = Date.now();
-            }
-            if (data.player) setPlayer(data.player);
-        });
-    }, [sessionId, locked]);
+    // Player physically walked into a path entrance — submit silently
+    const handleEnterPath = useCallback(async (questionNodeId, pathIndex) => {
+        if (!sessionId || finished) return;
 
-    const handleChoosePath = useCallback(async (chosenPath) => {
-        if (!question || locked) return;
-        setLocked(true);
+        const key = `${questionNodeId}_${pathIndex}`;
+        if (answeredRef.current.has(questionNodeId) || loadingRef.current.has(key)) return;
+        loadingRef.current.add(key);
+
         const timeTaken = Date.now() - questionTimeRef.current;
+        questionTimeRef.current = Date.now();
+
         try {
-            const result = await submitAnswer(sessionId, question.nodeId, chosenPath, timeTaken);
+            const result = await submitAnswer(sessionId, questionNodeId, pathIndex, timeTaken);
+
             if (result.correct) {
-                setQuestion(null);
+                answeredRef.current.add(questionNodeId);
                 setPlayer(prev => ({
                     ...prev,
                     depth: result.depth,
@@ -90,19 +90,21 @@ export default function GamePage() {
                     setFinished(true);
                 }
             } else {
-                setShowDeadEnd(true);
-                setPlayer(prev => ({ ...prev, mistakes: result.mistakes }));
-                setTimeout(() => {
-                    setShowDeadEnd(false);
-                    setLocked(false);
-                }, 3000);
-                return; // Don't unlock yet
+                // Wrong path — DON'T show overlay yet!
+                // Just silently update mistakes/score. Overlay shows when they reach the dead end.
+                setPlayer(prev => ({ ...prev, mistakes: result.mistakes, score: result.score }));
             }
         } catch (err) {
             console.error('Answer submit failed:', err);
         }
-        setLocked(false);
-    }, [question, sessionId, locked]);
+        loadingRef.current.delete(key);
+    }, [sessionId, finished]);
+
+    // Player physically reached a dead end — NOW show the "WRONG" feedback
+    const handleReachDeadEnd = useCallback(() => {
+        setShowDeadEnd(true);
+        setTimeout(() => setShowDeadEnd(false), 2000);
+    }, []);
 
     if (kicked) return (
         <div className="landing-page">
@@ -127,10 +129,9 @@ export default function GamePage() {
             >
                 <MazeScene
                     maze={maze}
-                    question={question}
-                    onReachQuestion={handleReachQuestion}
-                    onChoosePath={handleChoosePath}
-                    paused={paused || !!question || showDeadEnd || finished}
+                    questions={questions}
+                    onEnterPath={handleEnterPath}
+                    onReachDeadEnd={handleReachDeadEnd}
                     playerState={player}
                 />
             </Canvas>
@@ -138,14 +139,6 @@ export default function GamePage() {
             <div className="crosshair" />
 
             <HUD player={player} />
-
-            {question && !showDeadEnd && (
-                <QuestionOverlay
-                    question={question}
-                    onChoosePath={handleChoosePath}
-                    locked={locked}
-                />
-            )}
 
             {showDeadEnd && <DeadEndOverlay />}
             {finished && <VictoryOverlay player={player} />}
@@ -162,6 +155,16 @@ export default function GamePage() {
                     <p style={{ color: 'var(--text-secondary)', marginTop: 10 }}>The admin has paused the game.</p>
                 </div>
             )}
+
+            {/* Instructions */}
+            <div style={{
+                position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(0,0,0,0.7)', color: '#a5d6a7', padding: '8px 16px',
+                borderRadius: 8, fontFamily: 'Orbitron', fontSize: '0.7rem', letterSpacing: 1,
+                pointerEvents: 'none'
+            }}>
+                CLICK TO LOOK • WASD TO MOVE • WALK INTO A PATH TO ANSWER
+            </div>
 
             <Leaderboard sessionId={sessionId} />
         </div>

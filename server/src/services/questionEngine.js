@@ -1,5 +1,5 @@
 import Question from '../models/Question.js';
-import { getQuestionNodes, getStructuralCorrectPath, getDifficultyForDepth } from '../maze/mazeGraph.js';
+import { getQuestionNodes, createMazeGraph, getDifficultyForDepth } from '../maze/mazeGraph.js';
 
 // Seeded random number generator (mulberry32)
 function seededRandom(seed) {
@@ -21,12 +21,13 @@ function seededShuffle(array, rng) {
     return arr;
 }
 
-// Per-player question assignment cache (in-memory, resets on server restart)
+// Per-player question assignment cache
 const playerMappings = new Map();
 
 /**
- * Assign unique question mapping for a player session
- * Returns an object mapping questionNodeId -> { questionId, answerPathMapping }
+ * Assign unique question mapping for a player session.
+ * Each of the 30 maze nodes gets a unique question from the pool.
+ * Answer-to-path mapping is randomized per player.
  */
 export async function assignQuestionsToPlayer(sessionId, seed) {
     if (playerMappings.has(sessionId)) {
@@ -34,60 +35,59 @@ export async function assignQuestionsToPlayer(sessionId, seed) {
     }
 
     const rng = seededRandom(seed);
-    const questionNodes = getQuestionNodes();
+    const questionNodes = getQuestionNodes(); // 30 nodes
     const mapping = {};
+
+    // Get ALL questions and shuffle them with the player's seed
+    const allQuestions = await Question.find({ active: true });
+    if (allQuestions.length === 0) {
+        throw new Error('No questions available in database');
+    }
+
+    // Create a seeded shuffle of all questions for this player
+    const shuffledQuestions = seededShuffle(allQuestions, rng);
+
+    // Generate the maze structure using the player's seed
+    // This dictates which physical path is correct at each junction
+    const mazeData = createMazeGraph(seed);
+    const correctPaths = mazeData.correctPaths;
 
     for (let i = 0; i < questionNodes.length; i++) {
         const nodeId = questionNodes[i];
-        const depth = Math.floor(i / 2) + 1;
-        const difficulty = getDifficultyForDepth(depth);
 
-        // Get questions of appropriate difficulty
-        const questions = await Question.find({ difficulty: { $lte: difficulty + 1, $gte: Math.max(1, difficulty - 1) }, active: true });
+        // Pick question (wrap around if more nodes than questions)
+        const question = shuffledQuestions[i % shuffledQuestions.length];
 
-        if (questions.length === 0) {
-            throw new Error(`No questions available for difficulty ${difficulty}`);
-        }
+        // The structural correct path for this node, given the player's seed
+        const structuralCorrect = correctPaths[nodeId];
 
-        // Use seeded random to pick a question (unique per player due to different seed)
-        const shuffled = seededShuffle(questions, rng);
+        // We have 3 paths but questions may have 4 options.
+        // Pick 3 options: the correct one + 2 random wrong ones.
+        const correctIdx = question.correctIndex;
+        const allOptionIndices = question.options.map((_, idx) => idx);
+        const wrongIndices = allOptionIndices.filter(idx => idx !== correctIdx);
+        const shuffledWrong = seededShuffle(wrongIndices, rng);
+        const selectedWrong = shuffledWrong.slice(0, 2); // pick 2 wrong options
 
-        // Avoid repeats within the same player session
-        const usedQuestionIds = Object.values(mapping).map(m => m.questionId.toString());
-        const question = shuffled.find(q => !usedQuestionIds.includes(q._id.toString())) || shuffled[0];
-
-        // The structural correct path for this node
-        const structuralCorrect = getStructuralCorrectPath(nodeId);
-
-        // Create a randomized answer-to-path mapping
-        // pathMapping[physicalPathIndex] = optionIndex
-        const pathIndices = [0, 1, 2];
-        const shuffledPaths = seededShuffle(pathIndices, rng);
-
-        // Find which shuffled position maps to the correct answer
-        // We need: walking into structuralCorrect path => correct answer
-        // So: pathMapping[structuralCorrect] should = question.correctIndex
+        // pathMapping[physicalPathIndex] = optionIndex to display on that path
         const pathMapping = new Array(3);
-        const optionOrder = seededShuffle([0, 1, 2], rng);
 
-        // Ensure correct option maps to the structural correct path
-        pathMapping[structuralCorrect] = question.correctIndex;
+        // Correct option goes on the structural correct path
+        pathMapping[structuralCorrect] = correctIdx;
 
-        // Fill remaining paths with wrong options
-        const wrongOptions = [0, 1, 2].filter(o => o !== question.correctIndex);
+        // Wrong options go on the remaining paths
         const wrongPaths = [0, 1, 2].filter(p => p !== structuralCorrect);
-        const shuffledWrong = seededShuffle(wrongOptions, rng);
-
-        wrongPaths.forEach((pathIdx, i) => {
-            pathMapping[pathIdx] = shuffledWrong[i];
+        const shuffledWrongPaths = seededShuffle(wrongPaths, rng);
+        shuffledWrongPaths.forEach((pathIdx, j) => {
+            pathMapping[pathIdx] = selectedWrong[j];
         });
 
         mapping[nodeId] = {
             questionId: question._id,
             questionText: question.text,
             options: question.options,
-            pathMapping, // pathMapping[pathIndex] = optionIndex displayed on that path
-            correctPath: structuralCorrect, // DO NOT send to client
+            pathMapping,
+            correctPath: structuralCorrect, // SERVER-ONLY — never sent to client
             difficulty: question.difficulty
         };
     }
@@ -108,20 +108,19 @@ export function getQuestionForNode(sessionId, nodeId) {
     const pathLabels = {};
     for (let i = 0; i < 3; i++) {
         const optionIdx = data.pathMapping[i];
-        pathLabels[i] = data.options[optionIdx].obfuscated;
+        pathLabels[i] = data.options[optionIdx]?.obfuscated || data.options[optionIdx]?.text || `Path ${i + 1}`;
     }
 
     return {
         nodeId,
         questionText: data.questionText,
-        pathLabels, // { 0: "Abstract Label A", 1: "Abstract Label B", 2: "Abstract Label C" }
+        pathLabels,
         difficulty: data.difficulty
     };
 }
 
 /**
  * Validate which path the player chose (server-side only)
- * Returns { correct: boolean, correctPath: number }
  */
 export function validateAnswer(sessionId, nodeId, chosenPath) {
     const mapping = playerMappings.get(sessionId);
@@ -134,13 +133,10 @@ export function validateAnswer(sessionId, nodeId, chosenPath) {
 
     return {
         correct: isCorrect,
-        correctPath: undefined // Never expose correct path to client
+        correctPath: undefined // Never expose to client
     };
 }
 
-/**
- * Clear player mapping (on kick/reset)
- */
 export function clearPlayerMapping(sessionId) {
     playerMappings.delete(sessionId);
 }
