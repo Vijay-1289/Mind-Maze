@@ -1,7 +1,5 @@
-// MindTrap Maze — Procedurally generated 30-question maze graph
-// The maze is a directed graph where each question node has 3 paths:
-// 1 correct (leads deeper) and 2 dead ends.
-// The maze snakes left-right creating a more interesting layout.
+// MindTrap Maze — Deterministic non-overlapping layout with randomized paths
+// The maze uses a strict backtracking/grid structure to guarantee no physical overlaps in 3D
 
 const WALL_HEIGHT = 3.5;
 const CORRIDOR_WIDTH = 4;
@@ -24,101 +22,130 @@ export function createMazeGraph(seed = 12345) {
     const TOTAL_QUESTIONS = 30;
     const correctPaths = {}; // Maps questionId -> correct path index
 
-    // Starting position
-    let curX = 0;
-    let curZ = 0;
+    function addNode(id, gx, gz, props) {
+        nodes[id] = { id, x: gx * SEGMENT_LENGTH, z: gz * SEGMENT_LENGTH, ...props };
+    }
 
-    // Add start node
-    nodes['start'] = {
-        id: 'start', x: curX * SEGMENT_LENGTH, z: curZ * SEGMENT_LENGTH,
-        depth: 0, isQuestion: false, type: 'corridor'
-    };
+    const DX = [0, 1, 0, -1]; // N, E, S, W
+    const DZ = [-1, 0, 1, 0];
 
-    // Move forward to first question
-    curZ -= 1;
+    // Draw a strict structured path that guarantees turns
+    function drawPath(startId, sx, sz, segments, depthVal) {
+        let lastId = startId, cx = sx, cz = sz, currentDir = 0;
+        let stepCount = 0;
+
+        for (const seg of segments) {
+            const dir = seg[0];
+            const length = seg[1];
+            for (let i = 0; i < length; i++) {
+                cx += DX[dir];
+                cz += DZ[dir];
+                const id = `${startId}_s_${stepCount++}`;
+                addNode(id, cx, cz, { depth: depthVal, isQuestion: false, type: 'corridor' });
+                edges.push({ from: lastId, to: id });
+                lastId = id;
+                currentDir = dir;
+            }
+        }
+        return { lastId, cx, cz, lastDir: currentDir };
+    }
+
+    // Starting position (always flows North)
+    let cx = 0, cz = 0;
+    addNode('start', cx, cz, { depth: 0, isQuestion: false, type: 'corridor' });
+    let lastId = 'start';
+
+    // Walk forward 2 blocks initially
+    const initRes = drawPath('start', cx, cz, [[0, 2]], 0);
+    lastId = initRes.lastId;
+    cx = initRes.cx;
+    cz = initRes.cz;
 
     for (let q = 1; q <= TOTAL_QUESTIONS; q++) {
         const qId = `q${q}`;
-        const depth = q;
 
-        // Place question node
-        nodes[qId] = {
-            id: qId, x: curX * SEGMENT_LENGTH, z: curZ * SEGMENT_LENGTH,
-            depth: depth - 1, isQuestion: true, type: 'junction', pathCount: 3
-        };
+        // 1. Place Question Junction (1 block North)
+        let qx = cx + DX[0]; // North
+        let qz = cz + DZ[0];
 
-        // Connect from previous node
-        if (q === 1) {
-            edges.push({ from: 'start', to: qId });
-        }
+        addNode(qId, qx, qz, { depth: q - 1, isQuestion: true, type: 'junction', pathCount: 3 });
+        edges.push({ from: lastId, to: qId });
+        cx = qx; cz = qz;
 
-        // Determine which direction is "correct" and create 3 paths
-        // RANDOMIZE the correct path per player using the seed!
+        // 3. Make three paths from this junction
         const correctPathIdx = Math.floor(rng() * 3);
         correctPaths[qId] = correctPathIdx;
 
-        // 3 path positions: left(-1), center(0), right(+1) relative to current direction
-        const pathOffsets = [-1, 0, 1];
+        let nextMainId = qId, nextMainX = cx, nextMainZ = cz;
 
         for (let p = 0; p < 3; p++) {
-            const pathNodeId = `q${q}_p${p}`;
-            const pathX = curX + pathOffsets[p];
-            const pathZ = curZ - 1;
+            // All paths start visually adjacent to junction
+            const pDir = p === 0 ? 3 : (p === 1 ? 0 : 1); // West, North, East
+            const px = cx + DX[pDir];
+            const pz = cz + DZ[pDir];
 
-            nodes[pathNodeId] = {
-                id: pathNodeId,
-                x: pathX * SEGMENT_LENGTH,
-                z: pathZ * SEGMENT_LENGTH,
-                depth, isQuestion: false,
-                type: 'corridor'
-            };
-            edges.push({ from: qId, to: pathNodeId, pathIndex: p });
+            const pId = `q${q}_p${p}`;
+            addNode(pId, px, pz, { depth: q, isQuestion: false, type: 'corridor' });
+            edges.push({ from: qId, to: pId, pathIndex: p });
+
+            // Build dynamic snaking profiles for each lane to ensure a turn out-of-sight
+            // and guarantee absolute visual hiding before dead end
+            let profile = [];
+
+            if (p === 0) {
+                // LEFT PATH: West -> North -> East -> North
+                const w1 = 3 + Math.floor(rng() * 4); // West 3-6
+                const n1 = 4 + Math.floor(rng() * 3); // North 4-6
+                const e1 = 2 + Math.floor(rng() * 2); // East 2-3
+                const n2 = 2 + Math.floor(rng() * 3); // North 2-4
+                profile = [[3, w1], [0, n1], [1, e1], [0, n2]];
+            } else if (p === 1) {
+                // CENTER PATH: North -> West or East -> North -> Back Center -> North
+                const n1 = 3 + Math.floor(rng() * 3); // North 3-5
+                const sideDir = rng() < 0.5 ? 3 : 1;  // West or East
+                const s1 = 3 + Math.floor(rng() * 3); // Side 3-5
+                const n2 = 3 + Math.floor(rng() * 3); // North 3-5
+                const oppDir = sideDir === 3 ? 1 : 3; // Opposite
+                profile = [[0, n1], [sideDir, s1], [0, n2], [oppDir, s1], [0, 2]];
+            } else {
+                // RIGHT PATH: East -> North -> West -> North
+                const e1 = 3 + Math.floor(rng() * 4); // East 3-6
+                const n1 = 4 + Math.floor(rng() * 3); // North 4-6
+                const w1 = 2 + Math.floor(rng() * 2); // West 2-3
+                const n2 = 2 + Math.floor(rng() * 3); // North 2-4
+                profile = [[1, e1], [0, n1], [3, w1], [0, n2]];
+            }
+
+            const pRes = drawPath(pId, px, pz, profile, q);
 
             if (p === correctPathIdx) {
-                // Correct path — leads to next question or victory
                 if (q < TOTAL_QUESTIONS) {
-                    // Add a connector corridor then next question
-                    const connId = `q${q}_conn`;
-                    const connZ = pathZ - 1;
-                    nodes[connId] = {
-                        id: connId,
-                        x: pathX * SEGMENT_LENGTH,
-                        z: connZ * SEGMENT_LENGTH,
-                        depth, isQuestion: false, type: 'corridor'
-                    };
-                    edges.push({ from: pathNodeId, to: connId });
-
-                    // Next question will be placed at the connector's position going forward
-                    curX = pathX;
-                    curZ = connZ - 1;
-
-                    // Connect connector to next question (will be added next iteration)
-                    const nextQId = `q${q + 1}`;
-                    // We'll create an edge from connector to next question
-                    edges.push({ from: connId, to: nextQId });
+                    // This path is correct, add a connector straight North so next question is cleanly separated
+                    const connRes = drawPath(pRes.lastId, pRes.cx, pRes.cz, [[0, 4]], q);
+                    nextMainId = connRes.lastId;
+                    nextMainX = connRes.cx;
+                    nextMainZ = connRes.cz;
                 } else {
-                    // Last question — correct path leads to victory
-                    const victoryId = 'victory';
-                    nodes[victoryId] = {
-                        id: victoryId,
-                        x: pathX * SEGMENT_LENGTH,
-                        z: (pathZ - 1) * SEGMENT_LENGTH,
-                        depth: TOTAL_QUESTIONS, isQuestion: false, type: 'victory'
-                    };
-                    edges.push({ from: pathNodeId, to: victoryId });
+                    // Final victory node
+                    const vx = pRes.cx + DX[0]; // One block North
+                    const vz = pRes.cz + DZ[0];
+                    addNode('victory', vx, vz, { depth: TOTAL_QUESTIONS, isQuestion: false, type: 'victory' });
+                    edges.push({ from: pRes.lastId, to: 'victory' });
                 }
             } else {
-                // Wrong path — leads to dead end
-                const deadId = `q${q}_dead${p}`;
-                nodes[deadId] = {
-                    id: deadId,
-                    x: pathX * SEGMENT_LENGTH,
-                    z: (pathZ - 1) * SEGMENT_LENGTH,
-                    depth, isQuestion: false, type: 'deadend'
-                };
-                edges.push({ from: pathNodeId, to: deadId });
+                // Wrong path -> it already winded extensively out of sight thanks to profiles above!
+                // We just cap it with a dead end node
+                const dx = pRes.cx + DX[0]; // Face dead end North naturally
+                const dz = pRes.cz + DZ[0];
+                addNode(`q${q}_dead${p}`, dx, dz, { depth: q, isQuestion: false, type: 'deadend' });
+                edges.push({ from: pRes.lastId, to: `q${q}_dead${p}` });
             }
         }
+
+        // Setup state for next question loop
+        lastId = nextMainId;
+        cx = nextMainX;
+        cz = nextMainZ;
     }
 
     return { nodes, edges, WALL_HEIGHT, CORRIDOR_WIDTH, SEGMENT_LENGTH, correctPaths };

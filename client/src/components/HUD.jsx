@@ -29,16 +29,6 @@ export default function HUD({ player }) {
                 <span className="label">DEPTH</span>
                 <span className="value">{player.depth || 0}/30</span>
             </div>
-            <div className="hud-item">
-                <span className="label">MISTAKES</span>
-                <span className="value" style={{ color: player.mistakes > 5 ? 'var(--danger)' : undefined }}>
-                    {player.mistakes || 0}
-                </span>
-            </div>
-            <div className="hud-item">
-                <span className="label">SCORE</span>
-                <span className="value">{player.score || 0}</span>
-            </div>
         </div>
     );
 }
