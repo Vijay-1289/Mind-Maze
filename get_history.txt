@@ -1,0 +1,968 @@
+commit 4050b454d1702137bcd4612b324fadcc0c59a833
+Author: Vijay_1289 <vijay.siruvuru@gmail.com>
+Date:   Wed Feb 25 09:40:02 2026 +0530
+
+    Cooked Game
+
+diff --git a/server/src/maze/mazeGraph.js b/server/src/maze/mazeGraph.js
+index be98850..e7d9aa0 100644
+--- a/server/src/maze/mazeGraph.js
++++ b/server/src/maze/mazeGraph.js
+@@ -1,139 +1,206 @@
+-// MindTrap Maze — Procedurally generated 30-question maze graph
+-// The maze is a directed graph where each question node has 3 paths:
+-// 1 correct (leads deeper) and 2 dead ends.
+-// The maze snakes left-right creating a more interesting layout.
++// MindTrap Maze — Clean S-shaped winding maze with 30 questions
++//
++// The maze follows a clear serpentine (S-shaped) pattern:
++//   Go north several cells → turn east → go east → turn south →
++//   Go south several cells → turn east → go east → turn north → repeat
++//
++// Between questions: 4-6 corridor cells of exploration with turns.
++// Wrong paths: 3-4 cells before dead end.
++// Correct paths: continue into next exploration section.
++//
++// All connections are strictly cardinal (horizontal/vertical).
+ 
+ const WALL_HEIGHT = 3.5;
+ const CORRIDOR_WIDTH = 4;
+-const SEGMENT_LENGTH = 4;  // matches CELL size in MazeScene
++const SEGMENT_LENGTH = 4;
++
++// Seeded random number generator
++function seededRandom(seed) {
++    let t = seed + 0x6D2B79F5;
++    return function () {
++        t = Math.imul(t ^ (t >>> 15), t | 1);
++        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
++        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
++    };
++}
+ 
+-function createMazeGraph() {
++export function createMazeGraph(seed = 12345) {
++    const rng = seededRandom(seed);
+     const nodes = {};
+     const edges = [];
++    const occupied = new Set();
++    const correctPaths = {}; // Maps questionId -> correct path index
+     const TOTAL_QUESTIONS = 30;
+ 
+-    // Starting position
+-    let curX = 0;
+-    let curZ = 0;
++    function key(gx, gz) { return `${gx},${gz}`; }
++    function isFree(gx, gz) { return !occupied.has(key(gx, gz)); }
++    function addNode(id, gx, gz, props) {
++        occupied.add(key(gx, gz));
++        nodes[id] = { id, x: gx * SEGMENT_LENGTH, z: gz * SEGMENT_LENGTH, ...props };
++    }
+ 
+-    // Add start node
+-    nodes['start'] = {
+-        id: 'start', x: curX * SEGMENT_LENGTH, z: curZ * SEGMENT_LENGTH,
+-        depth: 0, isQuestion: false, type: 'corridor'
+-    };
++    // Directions: 0=north(-z), 1=east(+x), 2=south(+z), 3=west(-x)
++    const DX = [0, 1, 0, -1];
++    const DZ = [-1, 0, 1, 0];
++    function leftOf(d) { return (d + 3) % 4; }
++    function rightOf(d) { return (d + 1) % 4; }
++
++    // Place a chain of corridor nodes going in direction `dir` from (sx,sz)
++    // Returns { lastId, cx, cz }
++    function placeChain(startId, sx, sz, dir, count, depthVal) {
++        let lastId = startId, cx = sx, cz = sz;
++        for (let i = 0; i < count; i++) {
++            cx += DX[dir];
++            cz += DZ[dir];
++            if (!isFree(cx, cz)) break;
++            const id = `cor_${cx}_${cz}`;
++            addNode(id, cx, cz, { depth: depthVal, isQuestion: false, type: 'corridor' });
++            edges.push({ from: lastId, to: id });
++            lastId = id;
++        }
++        return { lastId, cx, cz };
++    }
+ 
+-    // Move forward to first question
+-    curZ -= 1;
++    // ─── Build the S-shaped maze ───
+ 
+-    for (let q = 1; q <= TOTAL_QUESTIONS; q++) {
+-        const qId = `q${q}`;
+-        const depth = q;
++    let cx = 0, cz = 0;
++    addNode('start', cx, cz, { depth: 0, isQuestion: false, type: 'corridor' });
++    let lastId = 'start';
+ 
+-        // Place question node
+-        nodes[qId] = {
+-            id: qId, x: curX * SEGMENT_LENGTH, z: curZ * SEGMENT_LENGTH,
+-            depth: depth - 1, isQuestion: true, type: 'junction', pathCount: 3
+-        };
++    // Main direction alternates: north, then south (serpentine)
++    // Lateral shift is always east (+x) to create the S-shape
++    let vertDir = 0; // 0 = north (-z), 2 = south (+z)
+ 
+-        // Connect from previous node
+-        if (q === 1) {
+-            edges.push({ from: 'start', to: qId });
++    for (let q = 1; q <= TOTAL_QUESTIONS; q++) {
++        // ═══ EXPLORATION: Go vertical 3-4 cells ═══
++        const vertLen = 3 + (q % 2); // alternates 3, 4
++        const vertResult = placeChain(lastId, cx, cz, vertDir, vertLen, q - 1);
++        lastId = vertResult.lastId;
++        cx = vertResult.cx;
++        cz = vertResult.cz;
++
++        // ═══ TURN: Go east 1-2 cells (lateral shift) ═══
++        const latLen = 1 + (q % 3 === 0 ? 1 : 0);
++        const latResult = placeChain(lastId, cx, cz, 1, latLen, q - 1); // east
++        lastId = latResult.lastId;
++        cx = latResult.cx;
++        cz = latResult.cz;
++
++        // ═══ QUESTION JUNCTION ═══
++        // Place question 1 cell forward in vertical direction
++        const qx = cx + DX[vertDir];
++        const qz = cz + DZ[vertDir];
++        if (!isFree(qx, qz)) {
++            // Fallback: place in current direction
++            cx += DX[1]; cz += DZ[1]; // go east
++        } else {
++            cx = qx; cz = qz;
+         }
+ 
+-        // Determine which direction is "correct" and create 3 paths
+-        // Vary the correct path position to make maze interesting
+-        // The maze snakes: odd questions go left-to-right, even go right-to-left
+-        const correctPathIdx = q % 3; // cycles 1, 2, 0, 1, 2, 0...
++        const qId = `q${q}`;
++        addNode(qId, cx, cz, { depth: q - 1, isQuestion: true, type: 'junction', pathCount: 3 });
++        edges.push({ from: lastId, to: qId });
+ 
+-        // 3 path positions: left(-1), center(0), right(+1) relative to current direction
+-        const pathOffsets = [-1, 0, 1];
++        // ═══ THREE BRANCHING PATHS ═══
++        // Paths go: left, forward, right relative to approach direction
++        const approachDir = vertDir; // player approaches from this direction
++        // RANDOMIZE the correct path per player using the seed!
++        const correctIdx = Math.floor(rng() * 3);
++        correctPaths[qId] = correctIdx;
++        const pathDirs = [leftOf(approachDir), approachDir, rightOf(approachDir)];
+ 
+         for (let p = 0; p < 3; p++) {
+-            const pathNodeId = `q${q}_p${p}`;
+-            const pathX = curX + pathOffsets[p];
+-            const pathZ = curZ - 1;
+-
+-            nodes[pathNodeId] = {
+-                id: pathNodeId,
+-                x: pathX * SEGMENT_LENGTH,
+-                z: pathZ * SEGMENT_LENGTH,
+-                depth, isQuestion: false,
+-                type: p === correctPathIdx ? 'corridor' : 'corridor'
+-            };
+-            edges.push({ from: qId, to: pathNodeId, pathIndex: p });
+-
+-            if (p === correctPathIdx) {
+-                // Correct path — leads to next question or victory
++            const pDir = pathDirs[p];
++            const px = cx + DX[pDir];
++            const pz = cz + DZ[pDir];
++            if (!isFree(px, pz)) continue;
++
++            const pId = `q${q}_p${p}`;
++            addNode(pId, px, pz, { depth: q, isQuestion: false, type: 'corridor' });
++            edges.push({ from: qId, to: pId, pathIndex: p });
++
++            if (p === correctIdx) {
++                // ═══ CORRECT PATH: 2-3 more corridor cells ═══
++                const corLen = 2 + (q % 2);
++                const corResult = placeChain(pId, px, pz, pDir, corLen, q);
++
+                 if (q < TOTAL_QUESTIONS) {
+-                    // Add a connector corridor then next question
+-                    const connId = `q${q}_conn`;
+-                    const connZ = pathZ - 1;
+-                    nodes[connId] = {
+-                        id: connId,
+-                        x: pathX * SEGMENT_LENGTH,
+-                        z: connZ * SEGMENT_LENGTH,
+-                        depth, isQuestion: false, type: 'corridor'
+-                    };
+-                    edges.push({ from: pathNodeId, to: connId });
+-
+-                    // Next question will be placed at the connector's position going forward
+-                    curX = pathX;
+-                    curZ = connZ - 1;
+-
+-                    // Connect connector to next question (will be added next iteration)
+-                    const nextQId = `q${q + 1}`;
+-                    // We'll create an edge from connector to next question
+-                    edges.push({ from: connId, to: nextQId });
++                    lastId = corResult.lastId;
++                    cx = corResult.cx;
++                    cz = corResult.cz;
++                    // After correct path: flip vertical direction for S-shape
++                    if (q % 5 === 0) vertDir = vertDir === 0 ? 2 : 0;
+                 } else {
+-                    // Last question — correct path leads to victory
+-                    const victoryId = 'victory';
+-                    nodes[victoryId] = {
+-                        id: victoryId,
+-                        x: pathX * SEGMENT_LENGTH,
+-                        z: (pathZ - 1) * SEGMENT_LENGTH,
+-                        depth: TOTAL_QUESTIONS, isQuestion: false, type: 'victory'
+-                    };
+-                    edges.push({ from: pathNodeId, to: victoryId });
++                    // Victory node
++                    const vx = corResult.cx + DX[pDir];
++                    const vz = corResult.cz + DZ[pDir];
++                    if (isFree(vx, vz)) {
++                        addNode('victory', vx, vz, { depth: TOTAL_QUESTIONS, isQuestion: false, type: 'victory' });
++                        edges.push({ from: corResult.lastId, to: 'victory' });
++                    }
+                 }
+             } else {
+-                // Wrong path — leads to dead end
+-                const deadId = `q${q}_dead${p}`;
+-                nodes[deadId] = {
+-                    id: deadId,
+-                    x: pathX * SEGMENT_LENGTH,
+-                    z: (pathZ - 1) * SEGMENT_LENGTH,
+-                    depth, isQuestion: false, type: 'deadend'
+-                };
+-                edges.push({ from: pathNodeId, to: deadId });
++                // ═══ WRONG PATH: Extended 6-8 winding cells → dead end ═══
++                let wDir = pDir;
++                let wLastId = pId, wx = px, wz = pz;
++
++                // We will create exactly 3 segments with 2 turns
++                const segmentLengths = [
++                    1 + Math.floor(rng() * 2), // 1-2 cells
++                    1 + Math.floor(rng() * 2), // 1-2 cells
++                    1 + Math.floor(rng() * 2)  // 1-2 cells
++                ];
++
++                for (let seg = 0; seg < segmentLengths.length; seg++) {
++                    const len = segmentLengths[seg];
++                    for (let s = 0; s < len; s++) {
++                        const nx = wx + DX[wDir], nz = wz + DZ[wDir];
++                        if (!isFree(nx, nz)) break; // Stop if wall hit
++                        const id = `q${q}_w${p}_seg${seg}_${s}`;
++                        addNode(id, nx, nz, { depth: q, isQuestion: false, type: 'corridor' });
++                        edges.push({ from: wLastId, to: id });
++                        wLastId = id; wx = nx; wz = nz;
++                    }
++
++                    // Turn at the end of the segment (except the last one)
++                    if (seg < segmentLengths.length - 1) {
++                        const turnLeft = rng() > 0.5;
++                        const turnDir = turnLeft ? leftOf(wDir) : rightOf(wDir);
++                        const tnx = wx + DX[turnDir], tnz = wz + DZ[turnDir];
++                        if (isFree(tnx, tnz)) {
++                            const tid = `q${q}_wt${p}_${seg}`;
++                            addNode(tid, tnx, tnz, { depth: q, isQuestion: false, type: 'corridor' });
++                            edges.push({ from: wLastId, to: tid });
++                            wLastId = tid; wx = tnx; wz = tnz; wDir = turnDir;
++                        } else {
++                            // If unable to turn without hitting wall, force stop extending
++                            break;
++                        }
++                    }
++                }
++
++                // Dead end
++                const deadX = wx + DX[wDir], deadZ = wz + DZ[wDir];
++                if (isFree(deadX, deadZ)) {
++                    const deadId = `q${q}_dead${p}`;
++                    addNode(deadId, deadX, deadZ, { depth: q, isQuestion: false, type: 'deadend' });
++                    edges.push({ from: wLastId, to: deadId });
++                } else {
++                    nodes[wLastId].type = 'deadend';
++                }
+             }
+         }
+     }
+ 
+-    return { nodes, edges, WALL_HEIGHT, CORRIDOR_WIDTH, SEGMENT_LENGTH };
++    return { nodes, edges, WALL_HEIGHT, CORRIDOR_WIDTH, SEGMENT_LENGTH, correctPaths };
+ }
+ 
+-// Get all question node IDs in order
+ export function getQuestionNodes() {
+     const nodes = [];
+     for (let i = 1; i <= 30; i++) nodes.push(`q${i}`);
+     return nodes;
+ }
+ 
+-// Structural correct path index for each question (before per-player randomization)
+-export function getStructuralCorrectPath(questionId) {
+-    const num = parseInt(questionId.replace('q', ''));
+-    return num % 3; // cycles 1, 2, 0, 1, 2, 0...
+-}
+-
+-// Get children paths for a question node
+-export function getQuestionPaths(questionId, mazeData) {
+-    return mazeData.edges
+-        .filter(e => e.from === questionId && e.pathIndex !== undefined)
+-        .sort((a, b) => a.pathIndex - b.pathIndex)
+-        .map(e => ({ nodeId: e.to, pathIndex: e.pathIndex }));
+-}
+-
+-// Get difficulty for a question based on depth (1-5 scale over 30 questions)
+ export function getDifficultyForDepth(depth) {
+     if (depth <= 6) return 1;
+     if (depth <= 12) return 2;
+@@ -141,6 +208,3 @@ export function getDifficultyForDepth(depth) {
+     if (depth <= 24) return 4;
+     return 5;
+ }
+-
+-const mazeData = createMazeGraph();
+-export default mazeData;
+
+commit eec4087d55a10e43d2c4ec93c72a34619f0c5e0c
+Author: Vijay_1289 <vijay.siruvuru@gmail.com>
+Date:   Tue Feb 24 20:07:04 2026 +0530
+
+    Created Maze
+
+diff --git a/server/src/maze/mazeGraph.js b/server/src/maze/mazeGraph.js
+index 5f85965..be98850 100644
+--- a/server/src/maze/mazeGraph.js
++++ b/server/src/maze/mazeGraph.js
+@@ -1,236 +1,128 @@
+-// MindTrap Maze — Pre-defined maze graph
+-// The maze is a directed acyclic graph where question nodes have multiple children (paths)
+-// Each path corresponds to an answer option
++// MindTrap Maze — Procedurally generated 30-question maze graph
++// The maze is a directed graph where each question node has 3 paths:
++// 1 correct (leads deeper) and 2 dead ends.
++// The maze snakes left-right creating a more interesting layout.
+ 
+-const WALL_HEIGHT = 4;
+-const CORRIDOR_WIDTH = 3;
+-const SEGMENT_LENGTH = 8;
++const WALL_HEIGHT = 3.5;
++const CORRIDOR_WIDTH = 4;
++const SEGMENT_LENGTH = 4;  // matches CELL size in MazeScene
+ 
+-// Generate a multi-level maze graph with question nodes at branch points
+ function createMazeGraph() {
+     const nodes = {};
+     const edges = [];
++    const TOTAL_QUESTIONS = 30;
+ 
+-    // ===== LEVEL 0: Entrance =====
++    // Starting position
++    let curX = 0;
++    let curZ = 0;
++
++    // Add start node
+     nodes['start'] = {
+-        id: 'start', x: 0, z: 0, depth: 0,
+-        isQuestion: false, type: 'corridor'
+-    };
+-    nodes['q1'] = {
+-        id: 'q1', x: 0, z: -SEGMENT_LENGTH, depth: 0,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'start', to: 'q1' });
+-
+-    // ===== LEVEL 1: After Q1, 3 paths =====
+-    nodes['q1_p0'] = { id: 'q1_p0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 2, depth: 1, isQuestion: false, type: 'corridor' };
+-    nodes['q1_p1'] = { id: 'q1_p1', x: 0, z: -SEGMENT_LENGTH * 2, depth: 1, isQuestion: false, type: 'corridor' };
+-    nodes['q1_p2'] = { id: 'q1_p2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 2, depth: 1, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q1', to: 'q1_p0', pathIndex: 0 });
+-    edges.push({ from: 'q1', to: 'q1_p1', pathIndex: 1 });
+-    edges.push({ from: 'q1', to: 'q1_p2', pathIndex: 2 });
+-
+-    // Dead ends for wrong answers at Q1
+-    nodes['q1_dead0'] = { id: 'q1_dead0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 3, depth: 1, isQuestion: false, type: 'deadend' };
+-    nodes['q1_dead2'] = { id: 'q1_dead2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 3, depth: 1, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q1_p0', to: 'q1_dead0' });
+-    edges.push({ from: 'q1_p2', to: 'q1_dead2' });
+-
+-    // Correct path continues (q1_p1 is "structurally" correct, but mapping is randomized per player)
+-    nodes['q2'] = {
+-        id: 'q2', x: 0, z: -SEGMENT_LENGTH * 3, depth: 1,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'q1_p1', to: 'q2' });
+-
+-    // ===== LEVEL 2: After Q2, 3 paths =====
+-    nodes['q2_p0'] = { id: 'q2_p0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 4, depth: 2, isQuestion: false, type: 'corridor' };
+-    nodes['q2_p1'] = { id: 'q2_p1', x: 0, z: -SEGMENT_LENGTH * 4, depth: 2, isQuestion: false, type: 'corridor' };
+-    nodes['q2_p2'] = { id: 'q2_p2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 4, depth: 2, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q2', to: 'q2_p0', pathIndex: 0 });
+-    edges.push({ from: 'q2', to: 'q2_p1', pathIndex: 1 });
+-    edges.push({ from: 'q2', to: 'q2_p2', pathIndex: 2 });
+-
+-    nodes['q2_dead0'] = { id: 'q2_dead0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 5, depth: 2, isQuestion: false, type: 'deadend' };
+-    nodes['q2_dead1'] = { id: 'q2_dead1', x: 0, z: -SEGMENT_LENGTH * 5, depth: 2, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q2_p0', to: 'q2_dead0' });
+-    edges.push({ from: 'q2_p1', to: 'q2_dead1' });
+-
+-    nodes['q3'] = {
+-        id: 'q3', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 5, depth: 2,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'q2_p2', to: 'q3' });
+-
+-    // ===== LEVEL 3: After Q3, 3 paths =====
+-    nodes['q3_p0'] = { id: 'q3_p0', x: 0, z: -SEGMENT_LENGTH * 6, depth: 3, isQuestion: false, type: 'corridor' };
+-    nodes['q3_p1'] = { id: 'q3_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 6, depth: 3, isQuestion: false, type: 'corridor' };
+-    nodes['q3_p2'] = { id: 'q3_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 6, depth: 3, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q3', to: 'q3_p0', pathIndex: 0 });
+-    edges.push({ from: 'q3', to: 'q3_p1', pathIndex: 1 });
+-    edges.push({ from: 'q3', to: 'q3_p2', pathIndex: 2 });
+-
+-    nodes['q3_dead1'] = { id: 'q3_dead1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 7, depth: 3, isQuestion: false, type: 'deadend' };
+-    nodes['q3_dead2'] = { id: 'q3_dead2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 7, depth: 3, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q3_p1', to: 'q3_dead1' });
+-    edges.push({ from: 'q3_p2', to: 'q3_dead2' });
+-
+-    nodes['q4'] = {
+-        id: 'q4', x: 0, z: -SEGMENT_LENGTH * 7, depth: 3,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'q3_p0', to: 'q4' });
+-
+-    // ===== LEVEL 4: After Q4, 3 paths =====
+-    nodes['q4_p0'] = { id: 'q4_p0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 8, depth: 4, isQuestion: false, type: 'corridor' };
+-    nodes['q4_p1'] = { id: 'q4_p1', x: 0, z: -SEGMENT_LENGTH * 8, depth: 4, isQuestion: false, type: 'corridor' };
+-    nodes['q4_p2'] = { id: 'q4_p2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 8, depth: 4, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q4', to: 'q4_p0', pathIndex: 0 });
+-    edges.push({ from: 'q4', to: 'q4_p1', pathIndex: 1 });
+-    edges.push({ from: 'q4', to: 'q4_p2', pathIndex: 2 });
+-
+-    nodes['q4_dead0'] = { id: 'q4_dead0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 9, depth: 4, isQuestion: false, type: 'deadend' };
+-    nodes['q4_dead2'] = { id: 'q4_dead2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 9, depth: 4, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q4_p0', to: 'q4_dead0' });
+-    edges.push({ from: 'q4_p2', to: 'q4_dead2' });
+-
+-    nodes['q5'] = {
+-        id: 'q5', x: 0, z: -SEGMENT_LENGTH * 9, depth: 4,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'q4_p1', to: 'q5' });
+-
+-    // ===== LEVEL 5: After Q5, 3 paths =====
+-    nodes['q5_p0'] = { id: 'q5_p0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 10, depth: 5, isQuestion: false, type: 'corridor' };
+-    nodes['q5_p1'] = { id: 'q5_p1', x: 0, z: -SEGMENT_LENGTH * 10, depth: 5, isQuestion: false, type: 'corridor' };
+-    nodes['q5_p2'] = { id: 'q5_p2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 10, depth: 5, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q5', to: 'q5_p0', pathIndex: 0 });
+-    edges.push({ from: 'q5', to: 'q5_p1', pathIndex: 1 });
+-    edges.push({ from: 'q5', to: 'q5_p2', pathIndex: 2 });
+-
+-    nodes['q5_dead0'] = { id: 'q5_dead0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 11, depth: 5, isQuestion: false, type: 'deadend' };
+-    nodes['q5_dead1'] = { id: 'q5_dead1', x: 0, z: -SEGMENT_LENGTH * 11, depth: 5, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q5_p0', to: 'q5_dead0' });
+-    edges.push({ from: 'q5_p1', to: 'q5_dead1' });
+-
+-    nodes['q6'] = {
+-        id: 'q6', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 11, depth: 5,
+-        isQuestion: true, type: 'junction', pathCount: 3
++        id: 'start', x: curX * SEGMENT_LENGTH, z: curZ * SEGMENT_LENGTH,
++        depth: 0, isQuestion: false, type: 'corridor'
+     };
+-    edges.push({ from: 'q5_p2', to: 'q6' });
+-
+-    // ===== LEVEL 6: After Q6, 3 paths =====
+-    nodes['q6_p0'] = { id: 'q6_p0', x: 0, z: -SEGMENT_LENGTH * 12, depth: 6, isQuestion: false, type: 'corridor' };
+-    nodes['q6_p1'] = { id: 'q6_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 12, depth: 6, isQuestion: false, type: 'corridor' };
+-    nodes['q6_p2'] = { id: 'q6_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 12, depth: 6, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q6', to: 'q6_p0', pathIndex: 0 });
+-    edges.push({ from: 'q6', to: 'q6_p1', pathIndex: 1 });
+-    edges.push({ from: 'q6', to: 'q6_p2', pathIndex: 2 });
+-
+-    nodes['q6_dead0'] = { id: 'q6_dead0', x: 0, z: -SEGMENT_LENGTH * 13, depth: 6, isQuestion: false, type: 'deadend' };
+-    nodes['q6_dead2'] = { id: 'q6_dead2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 13, depth: 6, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q6_p0', to: 'q6_dead0' });
+-    edges.push({ from: 'q6_p2', to: 'q6_dead2' });
+-
+-    nodes['q7'] = {
+-        id: 'q7', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 13, depth: 6,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'q6_p1', to: 'q7' });
+-
+-    // ===== LEVEL 7: After Q7, 3 paths =====
+-    nodes['q7_p0'] = { id: 'q7_p0', x: 0, z: -SEGMENT_LENGTH * 14, depth: 7, isQuestion: false, type: 'corridor' };
+-    nodes['q7_p1'] = { id: 'q7_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 14, depth: 7, isQuestion: false, type: 'corridor' };
+-    nodes['q7_p2'] = { id: 'q7_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 14, depth: 7, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q7', to: 'q7_p0', pathIndex: 0 });
+-    edges.push({ from: 'q7', to: 'q7_p1', pathIndex: 1 });
+-    edges.push({ from: 'q7', to: 'q7_p2', pathIndex: 2 });
+-
+-    nodes['q7_dead0'] = { id: 'q7_dead0', x: 0, z: -SEGMENT_LENGTH * 15, depth: 7, isQuestion: false, type: 'deadend' };
+-    nodes['q7_dead1'] = { id: 'q7_dead1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 15, depth: 7, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q7_p0', to: 'q7_dead0' });
+-    edges.push({ from: 'q7_p1', to: 'q7_dead1' });
+-
+-    nodes['q8'] = {
+-        id: 'q8', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 15, depth: 7,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'q7_p2', to: 'q8' });
+-
+-    // ===== LEVEL 8: After Q8, 3 paths =====
+-    nodes['q8_p0'] = { id: 'q8_p0', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 16, depth: 8, isQuestion: false, type: 'corridor' };
+-    nodes['q8_p1'] = { id: 'q8_p1', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 16, depth: 8, isQuestion: false, type: 'corridor' };
+-    nodes['q8_p2'] = { id: 'q8_p2', x: SEGMENT_LENGTH * 3, z: -SEGMENT_LENGTH * 16, depth: 8, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q8', to: 'q8_p0', pathIndex: 0 });
+-    edges.push({ from: 'q8', to: 'q8_p1', pathIndex: 1 });
+-    edges.push({ from: 'q8', to: 'q8_p2', pathIndex: 2 });
+-
+-    nodes['q8_dead1'] = { id: 'q8_dead1', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 17, depth: 8, isQuestion: false, type: 'deadend' };
+-    nodes['q8_dead2'] = { id: 'q8_dead2', x: SEGMENT_LENGTH * 3, z: -SEGMENT_LENGTH * 17, depth: 8, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q8_p1', to: 'q8_dead1' });
+-    edges.push({ from: 'q8_p2', to: 'q8_dead2' });
+-
+-    nodes['q9'] = {
+-        id: 'q9', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 17, depth: 8,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'q8_p0', to: 'q9' });
+-
+-    // ===== LEVEL 9: After Q9, 3 paths =====
+-    nodes['q9_p0'] = { id: 'q9_p0', x: 0, z: -SEGMENT_LENGTH * 18, depth: 9, isQuestion: false, type: 'corridor' };
+-    nodes['q9_p1'] = { id: 'q9_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 18, depth: 9, isQuestion: false, type: 'corridor' };
+-    nodes['q9_p2'] = { id: 'q9_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 18, depth: 9, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q9', to: 'q9_p0', pathIndex: 0 });
+-    edges.push({ from: 'q9', to: 'q9_p1', pathIndex: 1 });
+-    edges.push({ from: 'q9', to: 'q9_p2', pathIndex: 2 });
+-
+-    nodes['q9_dead0'] = { id: 'q9_dead0', x: 0, z: -SEGMENT_LENGTH * 19, depth: 9, isQuestion: false, type: 'deadend' };
+-    nodes['q9_dead2'] = { id: 'q9_dead2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 19, depth: 9, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q9_p0', to: 'q9_dead0' });
+-    edges.push({ from: 'q9_p2', to: 'q9_dead2' });
+-
+-    nodes['q10'] = {
+-        id: 'q10', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 19, depth: 9,
+-        isQuestion: true, type: 'junction', pathCount: 3
+-    };
+-    edges.push({ from: 'q9_p1', to: 'q10' });
+-
+-    // ===== LEVEL 10: Final question before victory =====
+-    nodes['q10_p0'] = { id: 'q10_p0', x: 0, z: -SEGMENT_LENGTH * 20, depth: 10, isQuestion: false, type: 'corridor' };
+-    nodes['q10_p1'] = { id: 'q10_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 20, depth: 10, isQuestion: false, type: 'corridor' };
+-    nodes['q10_p2'] = { id: 'q10_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 20, depth: 10, isQuestion: false, type: 'corridor' };
+-    edges.push({ from: 'q10', to: 'q10_p0', pathIndex: 0 });
+-    edges.push({ from: 'q10', to: 'q10_p1', pathIndex: 1 });
+-    edges.push({ from: 'q10', to: 'q10_p2', pathIndex: 2 });
+-
+-    nodes['q10_dead0'] = { id: 'q10_dead0', x: 0, z: -SEGMENT_LENGTH * 21, depth: 10, isQuestion: false, type: 'deadend' };
+-    nodes['q10_dead1'] = { id: 'q10_dead1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 21, depth: 10, isQuestion: false, type: 'deadend' };
+-    edges.push({ from: 'q10_p0', to: 'q10_dead0' });
+-    edges.push({ from: 'q10_p1', to: 'q10_dead1' });
+-
+-    // ===== VICTORY =====
+-    nodes['victory'] = {
+-        id: 'victory', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 21, depth: 10,
+-        isQuestion: false, type: 'victory'
+-    };
+-    edges.push({ from: 'q10_p2', to: 'victory' });
++
++    // Move forward to first question
++    curZ -= 1;
++
++    for (let q = 1; q <= TOTAL_QUESTIONS; q++) {
++        const qId = `q${q}`;
++        const depth = q;
++
++        // Place question node
++        nodes[qId] = {
++            id: qId, x: curX * SEGMENT_LENGTH, z: curZ * SEGMENT_LENGTH,
++            depth: depth - 1, isQuestion: true, type: 'junction', pathCount: 3
++        };
++
++        // Connect from previous node
++        if (q === 1) {
++            edges.push({ from: 'start', to: qId });
++        }
++
++        // Determine which direction is "correct" and create 3 paths
++        // Vary the correct path position to make maze interesting
++        // The maze snakes: odd questions go left-to-right, even go right-to-left
++        const correctPathIdx = q % 3; // cycles 1, 2, 0, 1, 2, 0...
++
++        // 3 path positions: left(-1), center(0), right(+1) relative to current direction
++        const pathOffsets = [-1, 0, 1];
++
++        for (let p = 0; p < 3; p++) {
++            const pathNodeId = `q${q}_p${p}`;
++            const pathX = curX + pathOffsets[p];
++            const pathZ = curZ - 1;
++
++            nodes[pathNodeId] = {
++                id: pathNodeId,
++                x: pathX * SEGMENT_LENGTH,
++                z: pathZ * SEGMENT_LENGTH,
++                depth, isQuestion: false,
++                type: p === correctPathIdx ? 'corridor' : 'corridor'
++            };
++            edges.push({ from: qId, to: pathNodeId, pathIndex: p });
++
++            if (p === correctPathIdx) {
++                // Correct path — leads to next question or victory
++                if (q < TOTAL_QUESTIONS) {
++                    // Add a connector corridor then next question
++                    const connId = `q${q}_conn`;
++                    const connZ = pathZ - 1;
++                    nodes[connId] = {
++                        id: connId,
++                        x: pathX * SEGMENT_LENGTH,
++                        z: connZ * SEGMENT_LENGTH,
++                        depth, isQuestion: false, type: 'corridor'
++                    };
++                    edges.push({ from: pathNodeId, to: connId });
++
++                    // Next question will be placed at the connector's position going forward
++                    curX = pathX;
++                    curZ = connZ - 1;
++
++                    // Connect connector to next question (will be added next iteration)
++                    const nextQId = `q${q + 1}`;
++                    // We'll create an edge from connector to next question
++                    edges.push({ from: connId, to: nextQId });
++                } else {
++                    // Last question — correct path leads to victory
++                    const victoryId = 'victory';
++                    nodes[victoryId] = {
++                        id: victoryId,
++                        x: pathX * SEGMENT_LENGTH,
++                        z: (pathZ - 1) * SEGMENT_LENGTH,
++                        depth: TOTAL_QUESTIONS, isQuestion: false, type: 'victory'
++                    };
++                    edges.push({ from: pathNodeId, to: victoryId });
++                }
++            } else {
++                // Wrong path — leads to dead end
++                const deadId = `q${q}_dead${p}`;
++                nodes[deadId] = {
++                    id: deadId,
++                    x: pathX * SEGMENT_LENGTH,
++                    z: (pathZ - 1) * SEGMENT_LENGTH,
++                    depth, isQuestion: false, type: 'deadend'
++                };
++                edges.push({ from: pathNodeId, to: deadId });
++            }
++        }
++    }
+ 
+     return { nodes, edges, WALL_HEIGHT, CORRIDOR_WIDTH, SEGMENT_LENGTH };
+ }
+ 
+-// Get the question node IDs in order
++// Get all question node IDs in order
+ export function getQuestionNodes() {
+-    return ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10'];
++    const nodes = [];
++    for (let i = 1; i <= 30; i++) nodes.push(`q${i}`);
++    return nodes;
+ }
+ 
+-// For a question node, get which path index leads to the correct continuation
+-// This is the "structural" correct path before per-player randomization
++// Structural correct path index for each question (before per-player randomization)
+ export function getStructuralCorrectPath(questionId) {
+-    const correctPaths = {
+-        'q1': 1, 'q2': 2, 'q3': 0, 'q4': 1, 'q5': 2,
+-        'q6': 1, 'q7': 2, 'q8': 0, 'q9': 1, 'q10': 2
+-    };
+-    return correctPaths[questionId];
++    const num = parseInt(questionId.replace('q', ''));
++    return num % 3; // cycles 1, 2, 0, 1, 2, 0...
+ }
+ 
+ // Get children paths for a question node
+@@ -241,12 +133,12 @@ export function getQuestionPaths(questionId, mazeData) {
+         .map(e => ({ nodeId: e.to, pathIndex: e.pathIndex }));
+ }
+ 
+-// Get difficulty for a question based on depth
++// Get difficulty for a question based on depth (1-5 scale over 30 questions)
+ export function getDifficultyForDepth(depth) {
+-    if (depth <= 2) return 1;
+-    if (depth <= 4) return 2;
+-    if (depth <= 6) return 3;
+-    if (depth <= 8) return 4;
++    if (depth <= 6) return 1;
++    if (depth <= 12) return 2;
++    if (depth <= 18) return 3;
++    if (depth <= 24) return 4;
+     return 5;
+ }
+ 
+
+commit cbf4b42d1de8a5d36dc668226454165af8715347
+Author: Vijay_1289 <vijay.siruvuru@gmail.com>
+Date:   Tue Feb 24 19:36:26 2026 +0530
+
+    First Commit
+
+diff --git a/server/src/maze/mazeGraph.js b/server/src/maze/mazeGraph.js
+new file mode 100644
+index 0000000..5f85965
+--- /dev/null
++++ b/server/src/maze/mazeGraph.js
+@@ -0,0 +1,254 @@
++// MindTrap Maze — Pre-defined maze graph
++// The maze is a directed acyclic graph where question nodes have multiple children (paths)
++// Each path corresponds to an answer option
++
++const WALL_HEIGHT = 4;
++const CORRIDOR_WIDTH = 3;
++const SEGMENT_LENGTH = 8;
++
++// Generate a multi-level maze graph with question nodes at branch points
++function createMazeGraph() {
++    const nodes = {};
++    const edges = [];
++
++    // ===== LEVEL 0: Entrance =====
++    nodes['start'] = {
++        id: 'start', x: 0, z: 0, depth: 0,
++        isQuestion: false, type: 'corridor'
++    };
++    nodes['q1'] = {
++        id: 'q1', x: 0, z: -SEGMENT_LENGTH, depth: 0,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'start', to: 'q1' });
++
++    // ===== LEVEL 1: After Q1, 3 paths =====
++    nodes['q1_p0'] = { id: 'q1_p0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 2, depth: 1, isQuestion: false, type: 'corridor' };
++    nodes['q1_p1'] = { id: 'q1_p1', x: 0, z: -SEGMENT_LENGTH * 2, depth: 1, isQuestion: false, type: 'corridor' };
++    nodes['q1_p2'] = { id: 'q1_p2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 2, depth: 1, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q1', to: 'q1_p0', pathIndex: 0 });
++    edges.push({ from: 'q1', to: 'q1_p1', pathIndex: 1 });
++    edges.push({ from: 'q1', to: 'q1_p2', pathIndex: 2 });
++
++    // Dead ends for wrong answers at Q1
++    nodes['q1_dead0'] = { id: 'q1_dead0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 3, depth: 1, isQuestion: false, type: 'deadend' };
++    nodes['q1_dead2'] = { id: 'q1_dead2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 3, depth: 1, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q1_p0', to: 'q1_dead0' });
++    edges.push({ from: 'q1_p2', to: 'q1_dead2' });
++
++    // Correct path continues (q1_p1 is "structurally" correct, but mapping is randomized per player)
++    nodes['q2'] = {
++        id: 'q2', x: 0, z: -SEGMENT_LENGTH * 3, depth: 1,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q1_p1', to: 'q2' });
++
++    // ===== LEVEL 2: After Q2, 3 paths =====
++    nodes['q2_p0'] = { id: 'q2_p0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 4, depth: 2, isQuestion: false, type: 'corridor' };
++    nodes['q2_p1'] = { id: 'q2_p1', x: 0, z: -SEGMENT_LENGTH * 4, depth: 2, isQuestion: false, type: 'corridor' };
++    nodes['q2_p2'] = { id: 'q2_p2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 4, depth: 2, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q2', to: 'q2_p0', pathIndex: 0 });
++    edges.push({ from: 'q2', to: 'q2_p1', pathIndex: 1 });
++    edges.push({ from: 'q2', to: 'q2_p2', pathIndex: 2 });
++
++    nodes['q2_dead0'] = { id: 'q2_dead0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 5, depth: 2, isQuestion: false, type: 'deadend' };
++    nodes['q2_dead1'] = { id: 'q2_dead1', x: 0, z: -SEGMENT_LENGTH * 5, depth: 2, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q2_p0', to: 'q2_dead0' });
++    edges.push({ from: 'q2_p1', to: 'q2_dead1' });
++
++    nodes['q3'] = {
++        id: 'q3', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 5, depth: 2,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q2_p2', to: 'q3' });
++
++    // ===== LEVEL 3: After Q3, 3 paths =====
++    nodes['q3_p0'] = { id: 'q3_p0', x: 0, z: -SEGMENT_LENGTH * 6, depth: 3, isQuestion: false, type: 'corridor' };
++    nodes['q3_p1'] = { id: 'q3_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 6, depth: 3, isQuestion: false, type: 'corridor' };
++    nodes['q3_p2'] = { id: 'q3_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 6, depth: 3, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q3', to: 'q3_p0', pathIndex: 0 });
++    edges.push({ from: 'q3', to: 'q3_p1', pathIndex: 1 });
++    edges.push({ from: 'q3', to: 'q3_p2', pathIndex: 2 });
++
++    nodes['q3_dead1'] = { id: 'q3_dead1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 7, depth: 3, isQuestion: false, type: 'deadend' };
++    nodes['q3_dead2'] = { id: 'q3_dead2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 7, depth: 3, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q3_p1', to: 'q3_dead1' });
++    edges.push({ from: 'q3_p2', to: 'q3_dead2' });
++
++    nodes['q4'] = {
++        id: 'q4', x: 0, z: -SEGMENT_LENGTH * 7, depth: 3,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q3_p0', to: 'q4' });
++
++    // ===== LEVEL 4: After Q4, 3 paths =====
++    nodes['q4_p0'] = { id: 'q4_p0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 8, depth: 4, isQuestion: false, type: 'corridor' };
++    nodes['q4_p1'] = { id: 'q4_p1', x: 0, z: -SEGMENT_LENGTH * 8, depth: 4, isQuestion: false, type: 'corridor' };
++    nodes['q4_p2'] = { id: 'q4_p2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 8, depth: 4, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q4', to: 'q4_p0', pathIndex: 0 });
++    edges.push({ from: 'q4', to: 'q4_p1', pathIndex: 1 });
++    edges.push({ from: 'q4', to: 'q4_p2', pathIndex: 2 });
++
++    nodes['q4_dead0'] = { id: 'q4_dead0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 9, depth: 4, isQuestion: false, type: 'deadend' };
++    nodes['q4_dead2'] = { id: 'q4_dead2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 9, depth: 4, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q4_p0', to: 'q4_dead0' });
++    edges.push({ from: 'q4_p2', to: 'q4_dead2' });
++
++    nodes['q5'] = {
++        id: 'q5', x: 0, z: -SEGMENT_LENGTH * 9, depth: 4,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q4_p1', to: 'q5' });
++
++    // ===== LEVEL 5: After Q5, 3 paths =====
++    nodes['q5_p0'] = { id: 'q5_p0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 10, depth: 5, isQuestion: false, type: 'corridor' };
++    nodes['q5_p1'] = { id: 'q5_p1', x: 0, z: -SEGMENT_LENGTH * 10, depth: 5, isQuestion: false, type: 'corridor' };
++    nodes['q5_p2'] = { id: 'q5_p2', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 10, depth: 5, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q5', to: 'q5_p0', pathIndex: 0 });
++    edges.push({ from: 'q5', to: 'q5_p1', pathIndex: 1 });
++    edges.push({ from: 'q5', to: 'q5_p2', pathIndex: 2 });
++
++    nodes['q5_dead0'] = { id: 'q5_dead0', x: -SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 11, depth: 5, isQuestion: false, type: 'deadend' };
++    nodes['q5_dead1'] = { id: 'q5_dead1', x: 0, z: -SEGMENT_LENGTH * 11, depth: 5, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q5_p0', to: 'q5_dead0' });
++    edges.push({ from: 'q5_p1', to: 'q5_dead1' });
++
++    nodes['q6'] = {
++        id: 'q6', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 11, depth: 5,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q5_p2', to: 'q6' });
++
++    // ===== LEVEL 6: After Q6, 3 paths =====
++    nodes['q6_p0'] = { id: 'q6_p0', x: 0, z: -SEGMENT_LENGTH * 12, depth: 6, isQuestion: false, type: 'corridor' };
++    nodes['q6_p1'] = { id: 'q6_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 12, depth: 6, isQuestion: false, type: 'corridor' };
++    nodes['q6_p2'] = { id: 'q6_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 12, depth: 6, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q6', to: 'q6_p0', pathIndex: 0 });
++    edges.push({ from: 'q6', to: 'q6_p1', pathIndex: 1 });
++    edges.push({ from: 'q6', to: 'q6_p2', pathIndex: 2 });
++
++    nodes['q6_dead0'] = { id: 'q6_dead0', x: 0, z: -SEGMENT_LENGTH * 13, depth: 6, isQuestion: false, type: 'deadend' };
++    nodes['q6_dead2'] = { id: 'q6_dead2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 13, depth: 6, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q6_p0', to: 'q6_dead0' });
++    edges.push({ from: 'q6_p2', to: 'q6_dead2' });
++
++    nodes['q7'] = {
++        id: 'q7', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 13, depth: 6,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q6_p1', to: 'q7' });
++
++    // ===== LEVEL 7: After Q7, 3 paths =====
++    nodes['q7_p0'] = { id: 'q7_p0', x: 0, z: -SEGMENT_LENGTH * 14, depth: 7, isQuestion: false, type: 'corridor' };
++    nodes['q7_p1'] = { id: 'q7_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 14, depth: 7, isQuestion: false, type: 'corridor' };
++    nodes['q7_p2'] = { id: 'q7_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 14, depth: 7, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q7', to: 'q7_p0', pathIndex: 0 });
++    edges.push({ from: 'q7', to: 'q7_p1', pathIndex: 1 });
++    edges.push({ from: 'q7', to: 'q7_p2', pathIndex: 2 });
++
++    nodes['q7_dead0'] = { id: 'q7_dead0', x: 0, z: -SEGMENT_LENGTH * 15, depth: 7, isQuestion: false, type: 'deadend' };
++    nodes['q7_dead1'] = { id: 'q7_dead1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 15, depth: 7, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q7_p0', to: 'q7_dead0' });
++    edges.push({ from: 'q7_p1', to: 'q7_dead1' });
++
++    nodes['q8'] = {
++        id: 'q8', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 15, depth: 7,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q7_p2', to: 'q8' });
++
++    // ===== LEVEL 8: After Q8, 3 paths =====
++    nodes['q8_p0'] = { id: 'q8_p0', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 16, depth: 8, isQuestion: false, type: 'corridor' };
++    nodes['q8_p1'] = { id: 'q8_p1', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 16, depth: 8, isQuestion: false, type: 'corridor' };
++    nodes['q8_p2'] = { id: 'q8_p2', x: SEGMENT_LENGTH * 3, z: -SEGMENT_LENGTH * 16, depth: 8, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q8', to: 'q8_p0', pathIndex: 0 });
++    edges.push({ from: 'q8', to: 'q8_p1', pathIndex: 1 });
++    edges.push({ from: 'q8', to: 'q8_p2', pathIndex: 2 });
++
++    nodes['q8_dead1'] = { id: 'q8_dead1', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 17, depth: 8, isQuestion: false, type: 'deadend' };
++    nodes['q8_dead2'] = { id: 'q8_dead2', x: SEGMENT_LENGTH * 3, z: -SEGMENT_LENGTH * 17, depth: 8, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q8_p1', to: 'q8_dead1' });
++    edges.push({ from: 'q8_p2', to: 'q8_dead2' });
++
++    nodes['q9'] = {
++        id: 'q9', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 17, depth: 8,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q8_p0', to: 'q9' });
++
++    // ===== LEVEL 9: After Q9, 3 paths =====
++    nodes['q9_p0'] = { id: 'q9_p0', x: 0, z: -SEGMENT_LENGTH * 18, depth: 9, isQuestion: false, type: 'corridor' };
++    nodes['q9_p1'] = { id: 'q9_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 18, depth: 9, isQuestion: false, type: 'corridor' };
++    nodes['q9_p2'] = { id: 'q9_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 18, depth: 9, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q9', to: 'q9_p0', pathIndex: 0 });
++    edges.push({ from: 'q9', to: 'q9_p1', pathIndex: 1 });
++    edges.push({ from: 'q9', to: 'q9_p2', pathIndex: 2 });
++
++    nodes['q9_dead0'] = { id: 'q9_dead0', x: 0, z: -SEGMENT_LENGTH * 19, depth: 9, isQuestion: false, type: 'deadend' };
++    nodes['q9_dead2'] = { id: 'q9_dead2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 19, depth: 9, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q9_p0', to: 'q9_dead0' });
++    edges.push({ from: 'q9_p2', to: 'q9_dead2' });
++
++    nodes['q10'] = {
++        id: 'q10', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 19, depth: 9,
++        isQuestion: true, type: 'junction', pathCount: 3
++    };
++    edges.push({ from: 'q9_p1', to: 'q10' });
++
++    // ===== LEVEL 10: Final question before victory =====
++    nodes['q10_p0'] = { id: 'q10_p0', x: 0, z: -SEGMENT_LENGTH * 20, depth: 10, isQuestion: false, type: 'corridor' };
++    nodes['q10_p1'] = { id: 'q10_p1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 20, depth: 10, isQuestion: false, type: 'corridor' };
++    nodes['q10_p2'] = { id: 'q10_p2', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 20, depth: 10, isQuestion: false, type: 'corridor' };
++    edges.push({ from: 'q10', to: 'q10_p0', pathIndex: 0 });
++    edges.push({ from: 'q10', to: 'q10_p1', pathIndex: 1 });
++    edges.push({ from: 'q10', to: 'q10_p2', pathIndex: 2 });
++
++    nodes['q10_dead0'] = { id: 'q10_dead0', x: 0, z: -SEGMENT_LENGTH * 21, depth: 10, isQuestion: false, type: 'deadend' };
++    nodes['q10_dead1'] = { id: 'q10_dead1', x: SEGMENT_LENGTH, z: -SEGMENT_LENGTH * 21, depth: 10, isQuestion: false, type: 'deadend' };
++    edges.push({ from: 'q10_p0', to: 'q10_dead0' });
++    edges.push({ from: 'q10_p1', to: 'q10_dead1' });
++
++    // ===== VICTORY =====
++    nodes['victory'] = {
++        id: 'victory', x: SEGMENT_LENGTH * 2, z: -SEGMENT_LENGTH * 21, depth: 10,
++        isQuestion: false, type: 'victory'
++    };
++    edges.push({ from: 'q10_p2', to: 'victory' });
++
++    return { nodes, edges, WALL_HEIGHT, CORRIDOR_WIDTH, SEGMENT_LENGTH };
++}
++
++// Get the question node IDs in order
++export function getQuestionNodes() {
++    return ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10'];
++}
++
++// For a question node, get which path index leads to the correct continuation
++// This is the "structural" correct path before per-player randomization
++export function getStructuralCorrectPath(questionId) {
++    const correctPaths = {
++        'q1': 1, 'q2': 2, 'q3': 0, 'q4': 1, 'q5': 2,
++        'q6': 1, 'q7': 2, 'q8': 0, 'q9': 1, 'q10': 2
++    };
++    return correctPaths[questionId];
++}
++
++// Get children paths for a question node
++export function getQuestionPaths(questionId, mazeData) {
++    return mazeData.edges
++        .filter(e => e.from === questionId && e.pathIndex !== undefined)
++        .sort((a, b) => a.pathIndex - b.pathIndex)
++        .map(e => ({ nodeId: e.to, pathIndex: e.pathIndex }));
++}
++
++// Get difficulty for a question based on depth
++export function getDifficultyForDepth(depth) {
++    if (depth <= 2) return 1;
++    if (depth <= 4) return 2;
++    if (depth <= 6) return 3;
++    if (depth <= 8) return 4;
++    return 5;
++}
++
++const mazeData = createMazeGraph();
++export default mazeData;

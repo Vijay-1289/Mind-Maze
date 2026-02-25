@@ -19,7 +19,14 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: ['http://localhost:5173', 'http://localhost:3000'],
+        origin: (origin, callback) => {
+            // Allow localhost or deployed frontend (or no origin for server-to-server)
+            if (!origin || origin.includes('localhost') || origin.includes('netlify.app') || process.env.CORS_ORIGIN === '*') {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
         methods: ['GET', 'POST', 'PUT', 'DELETE'],
         credentials: true
     }
@@ -30,7 +37,14 @@ app.set('io', io);
 
 // Middleware
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: (origin, callback) => {
+        // Allow localhost or deployed frontend (or no origin for mobile/tools)
+        if (!origin || origin.includes('localhost') || origin.includes('netlify.app') || process.env.CORS_ORIGIN === '*') {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 app.use(helmet({ contentSecurityPolicy: false }));
