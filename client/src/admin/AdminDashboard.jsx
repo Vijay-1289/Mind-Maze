@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminGetPlayers, adminGetStats, adminAction } from '../api';
 import { connectSocket } from '../socket';
+import AdminQuestions from './AdminQuestions';
 
 export default function AdminDashboard() {
     const navigate = useNavigate();
@@ -135,12 +136,8 @@ export default function AdminDashboard() {
             )}
 
             {tab === 'questions' && (
-                <div style={{ color: 'var(--text-secondary)', padding: 20, textAlign: 'center' }}>
-                    <p>Question management available via API endpoints.</p>
-                    <p style={{ marginTop: 8 }}>POST /api/admin/questions — Add question</p>
-                    <p>POST /api/admin/questions/upload — CSV bulk upload</p>
-                    <p>PUT /api/admin/questions/:id — Edit</p>
-                    <p>DELETE /api/admin/questions/:id — Delete</p>
+                <div style={{ padding: '20px' }}>
+                    <AdminQuestions token={token} />
                 </div>
             )}
         </div>

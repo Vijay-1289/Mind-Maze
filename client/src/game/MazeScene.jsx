@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { Text } from '@react-three/drei';
+import { Text, Instances, Instance } from '@react-three/drei';
 import * as THREE from 'three';
 
 const PLAYER_HEIGHT = 1.7;
@@ -52,7 +52,6 @@ function QuestionSign({ position, rotY, text, difficulty }) {
             <Text position={[0, 2.18, 0.05]} fontSize={0.09} color="#5d4037" anchorX="center" anchorY="middle">
                 {`${'★'.repeat(difficulty)}${'☆'.repeat(5 - difficulty)}`}
             </Text>
-            <pointLight position={[0, 3.2, 0.3]} intensity={1.0} distance={8} color="#fff9c4" />
         </group>
     );
 }
@@ -65,7 +64,6 @@ function PathSign({ position, rotY, text }) {
             <mesh position={[0, 2.15, -0.02]}><boxGeometry args={[1.9, 0.55, 0.04]} /><meshStandardMaterial color="#ffffff" /></mesh>
             <mesh position={[0, 2.15, 0]}><boxGeometry args={[1.8, 0.45, 0.06]} /><meshStandardMaterial color="#1b5e20" roughness={0.35} /></mesh>
             <Text position={[0, 2.15, 0.04]} fontSize={0.12} maxWidth={1.5} color="#ffffff" anchorX="center" anchorY="middle" textAlign="center" fontWeight="bold">{text}</Text>
-            <pointLight position={[0, 2.5, 0]} intensity={0.3} distance={4} color="#ffffff" />
         </group>
     );
 }
@@ -314,7 +312,6 @@ export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd
             <ambientLight intensity={0.9} />
             <directionalLight position={[50, 30, -200]} intensity={1.8} color="#fffde7" castShadow />
             <hemisphereLight skyColor="#87ceeb" groundColor="#4caf50" intensity={0.6} />
-            {Array.from({ length: 20 }, (_, i) => <pointLight key={i} position={[i * 5, 8, -i * 25]} intensity={0.7} distance={50} />)}
             <fog attach="fog" args={['#c8e6c9', 25, 90]} />
 
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[200, -0.05, -200]} receiveShadow>
@@ -322,23 +319,48 @@ export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd
                 <meshStandardMaterial color="#7cb342" roughness={0.95} />
             </mesh>
 
-            {wallMeshData.map((w, i) => (
-                <group key={i}>
-                    <mesh position={w.p} castShadow><boxGeometry args={w.s} /><primitive object={wallMat} attach="material" /></mesh>
-                    <mesh position={[w.p[0], w.p[1] + w.s[1] / 2 + 0.1, w.p[2]]}><boxGeometry args={[w.s[0] + 0.15, 0.2, w.s[2] + 0.15]} /><primitive object={wallTopMat} attach="material" /></mesh>
-                </group>
-            ))}
+            {wallMeshData.length > 0 && (
+                <>
+                    <Instances limit={10000} range={wallMeshData.length} material={wallMat} castShadow receiveShadow>
+                        <boxGeometry args={[1, 1, 1]} />
+                        {wallMeshData.map((w, i) => (
+                            <Instance key={`w-${i}`} position={w.p} scale={w.s} />
+                        ))}
+                    </Instances>
+                    <Instances limit={10000} range={wallMeshData.length} material={wallTopMat} castShadow receiveShadow>
+                        <boxGeometry args={[1, 1, 1]} />
+                        {wallMeshData.map((w, i) => (
+                            <Instance key={`wt-${i}`} position={[w.p[0], w.p[1] + w.s[1] / 2 + 0.1, w.p[2]]} scale={[w.s[0] + 0.15, 0.2, w.s[2] + 0.15]} />
+                        ))}
+                    </Instances>
+                </>
+            )}
 
-            {floorTiles.map((f, i) => (
-                <mesh key={i} position={f.p} receiveShadow>
-                    <boxGeometry args={f.s} />
-                    <primitive object={f.t === 'deadend' ? deadFloorMat : f.t === 'victory' ? victoryFloorMat : floorMat} attach="material" />
-                </mesh>
-            ))}
+            {floorTiles.length > 0 && (
+                <>
+                    <Instances limit={10000} range={floorTiles.filter(f => f.t !== 'deadend' && f.t !== 'victory').length} material={floorMat} receiveShadow>
+                        <boxGeometry args={[1, 1, 1]} />
+                        {floorTiles.filter(f => f.t !== 'deadend' && f.t !== 'victory').map((f, i) => (
+                            <Instance key={`f-norm-${i}`} position={f.p} scale={f.s} />
+                        ))}
+                    </Instances>
+                    <Instances limit={10000} range={floorTiles.filter(f => f.t === 'deadend').length} material={deadFloorMat} receiveShadow>
+                        <boxGeometry args={[1, 1, 1]} />
+                        {floorTiles.filter(f => f.t === 'deadend').map((f, i) => (
+                            <Instance key={`f-dead-${i}`} position={f.p} scale={f.s} />
+                        ))}
+                    </Instances>
+                    <Instances limit={10000} range={floorTiles.filter(f => f.t === 'victory').length} material={victoryFloorMat} receiveShadow>
+                        <boxGeometry args={[1, 1, 1]} />
+                        {floorTiles.filter(f => f.t === 'victory').map((f, i) => (
+                            <Instance key={`f-vic-${i}`} position={f.p} scale={f.s} />
+                        ))}
+                    </Instances>
+                </>
+            )}
 
             {deadEndSignData.map((de, i) => (
                 <group key={i} position={[de.x, 0, de.z]} rotation={[0, de.rotY, 0]}>
-                    <pointLight position={[0, 2, 0]} intensity={0.8} distance={8} color="#f44336" />
                     <mesh position={[0, 1.2, 0]}><cylinderGeometry args={[0.04, 0.04, 2.4, 6]} /><meshStandardMaterial color="#9e9e9e" metalness={0.7} /></mesh>
                     <mesh position={[0, 2.5, 0]}><boxGeometry args={[1.8, 0.6, 0.06]} /><meshStandardMaterial color="#d32f2f" /></mesh>
                     <Text position={[0, 2.5, 0.04]} fontSize={0.22} color="#ffffff" anchorX="center" anchorY="middle" fontWeight="bold">DEAD END</Text>
