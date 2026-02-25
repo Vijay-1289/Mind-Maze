@@ -133,10 +133,14 @@ export function createMazeGraph(seed = 12345) {
                     edges.push({ from: pRes.lastId, to: 'victory' });
                 }
             } else {
-                // Wrong path -> it already winded extensively out of sight thanks to profiles above!
-                // We just cap it with a dead end node
-                const dx = pRes.cx + DX[0]; // Face dead end North naturally
-                const dz = pRes.cz + DZ[0];
+                // Wrong path -> it naturally ends at the last block of its profile.
+                // We add a 'deadend' type node directly into the wall they are facing,
+                // making it visibly blocked.
+                const finalDir = pRes.lastDir; // The direction the player is looking at the end of the profile
+                const dx = pRes.cx + DX[finalDir];
+                const dz = pRes.cz + DZ[finalDir];
+
+                // Mark it as a deadend so MazeScene generates the red banner
                 addNode(`q${q}_dead${p}`, dx, dz, { depth: q, isQuestion: false, type: 'deadend' });
                 edges.push({ from: pRes.lastId, to: `q${q}_dead${p}` });
             }
