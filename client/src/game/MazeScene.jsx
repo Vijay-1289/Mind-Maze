@@ -203,8 +203,8 @@ export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd
 
         // ── MOVE: W / ↑ = forward, S / ↓ = backward ──
         let fwd = 0;
-        if (k['KeyW'] || k['ArrowUp']) fwd = -1;
-        if (k['KeyS'] || k['ArrowDown']) fwd = 1;
+        if (k['KeyW'] || k['ArrowUp']) fwd = 1;
+        if (k['KeyS'] || k['ArrowDown']) fwd = -1;
 
         if (fwd !== 0) {
             const speed = MOVE_SPEED * dt * fwd;
