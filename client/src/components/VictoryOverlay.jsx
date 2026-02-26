@@ -22,9 +22,9 @@ export default function VictoryOverlay({ player }) {
                 transition={{ duration: 0.8, type: 'spring' }}>
                 🏆 MAZE CONQUERED 🏆
             </motion.h1>
-            <motion.p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontSize: '1.1rem' }}
+            <motion.p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontSize: '1.2rem', textAlign: 'center' }}
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-                Congratulations, {player?.name || 'Player'}!
+                Congratulations, <span className="victory-username">{player?.name || 'Player'}</span>!
             </motion.p>
             <motion.div className="victory-stats"
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
