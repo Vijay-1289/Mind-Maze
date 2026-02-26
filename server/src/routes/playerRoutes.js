@@ -182,15 +182,11 @@ router.post('/answer', answerLimiter, checkSuspiciousActivity, async (req, res) 
             if (nextEdge) {
                 player.currentNode = nextEdge.to;
 
-                // Check for child corridor leading to next question or victory
-                const childEdge = mazeData.edges.find(e => e.from === nextEdge.to);
-                if (childEdge) {
-                    const childNode = mazeData.nodes[childEdge.to];
-                    if (childNode?.type === 'victory') {
-                        player.status = 'finished';
-                        player.completedAt = new Date();
-                        player.calculateScore();
-                    }
+                // Check if they reached the end of the maze
+                if (player.depth >= 30) {
+                    player.status = 'finished';
+                    player.completedAt = new Date();
+                    player.calculateScore();
                 }
             }
 

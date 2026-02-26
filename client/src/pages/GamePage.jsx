@@ -93,11 +93,9 @@ export default function GamePage() {
                     ...prev,
                     depth: result.depth,
                     mistakes: result.mistakes,
-                    score: result.score
+                    score: result.score,
+                    status: result.finished ? 'finished' : prev?.status
                 }));
-                if (result.finished) {
-                    setFinished(true);
-                }
             } else {
                 // Wrong path — DON'T show overlay yet!
                 // Just silently update mistakes/score. Overlay shows when they reach the dead end.
@@ -114,6 +112,11 @@ export default function GamePage() {
         setShowDeadEnd(true);
         setTimeout(() => setShowDeadEnd(false), 2000);
     }, []);
+
+    // Player physically reached the Victory mat at the end of the final path
+    const handleReachVictory = useCallback(() => {
+        if (!finished) setFinished(true);
+    }, [finished]);
 
     if (kicked) return (
         <div className="landing-page">
@@ -141,6 +144,7 @@ export default function GamePage() {
                     questions={questions}
                     onEnterPath={handleEnterPath}
                     onReachDeadEnd={handleReachDeadEnd}
+                    onReachVictory={handleReachVictory}
                     playerState={player}
                 />
             </Canvas>

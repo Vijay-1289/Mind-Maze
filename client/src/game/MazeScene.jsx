@@ -69,7 +69,7 @@ function PathSign({ position, rotY, text }) {
 }
 
 // ── Main Maze Scene ──
-export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd }) {
+export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd, onReachVictory, playerState }) {
     const { camera, gl } = useThree();
     const keysRef = useRef({});
     const yawRef = useRef(Math.PI);
@@ -83,8 +83,8 @@ export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd
     const testSize = useRef(new THREE.Vector3(PLAYER_R * 2, PLAYER_HEIGHT, PLAYER_R * 2));
 
     // ─── Build maze geometry + pre-compute collision ───
-    const { wallBoxes, wallMeshData, floorTiles, questionZones, deadEndZones, pathZones } = useMemo(() => {
-        if (!maze) return { wallBoxes: [], wallMeshData: [], floorTiles: [], questionZones: [], deadEndZones: [], pathZones: [] };
+    const { wallBoxes, wallMeshData, floorTiles, questionZones, deadEndZones, pathZones, victoryZones } = useMemo(() => {
+        if (!maze) return { wallBoxes: [], wallMeshData: [], floorTiles: [], questionZones: [], deadEndZones: [], pathZones: [], victoryZones: [] };
 
         const S = maze.SEGMENT_LENGTH;
         const nodePos = {};
@@ -140,12 +140,13 @@ export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd
         addW(bMaxX, WALL_H / 2, (bMinZ + bMaxZ) / 2, WALL_T, WALL_H, bMaxZ - bMinZ + WALL_T);
         addW(bMinX, WALL_H / 2, (bMinZ + bMaxZ) / 2, WALL_T, WALL_H, bMaxZ - bMinZ + WALL_T);
 
-        const floors = [], qZ = [], deZ = [], pZ = [];
+        const floors = [], qZ = [], deZ = [], pZ = [], vZ = [];
         for (const [id, node] of Object.entries(maze.nodes)) {
             const { gx, gz } = nodePos[id];
             floors.push({ p: [gx * CELL, 0, gz * CELL], s: [CELL, 0.1, CELL], t: node.type });
             if (node.isQuestion) qZ.push({ id, x: gx * CELL, z: gz * CELL });
             if (node.type === 'deadend') deZ.push({ id, x: gx * CELL, z: gz * CELL });
+            if (node.type === 'victory') vZ.push({ id, x: gx * CELL, z: gz * CELL });
         }
         for (const edge of maze.edges) {
             if (edge.pathIndex !== undefined) {
@@ -154,7 +155,7 @@ export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd
             }
         }
 
-        return { wallBoxes: wBoxes, wallMeshData: wData, floorTiles: floors, questionZones: qZ, deadEndZones: deZ, pathZones: pZ };
+        return { wallBoxes: wBoxes, wallMeshData: wData, floorTiles: floors, questionZones: qZ, deadEndZones: deZ, pathZones: pZ, victoryZones: vZ };
     }, [maze]);
 
     // ─── Pointer lock ───
@@ -244,6 +245,18 @@ export default function MazeScene({ maze, questions, onEnterPath, onReachDeadEnd
                 if (!deadEndHitRef.current.has(de.id)) {
                     deadEndHitRef.current.add(de.id);
                     onReachDeadEnd(de.id);
+                }
+            }
+        }
+
+        // Victory detection — only fires when player physically reaches the victory node
+        for (let i = 0; i < victoryZones.length; i++) {
+            const vz = victoryZones[i];
+            const ddx = px - vz.x, ddz = pz2 - vz.z;
+            if (ddx * ddx + ddz * ddz < 4.0) {
+                if (!deadEndHitRef.current.has(vz.id)) {
+                    deadEndHitRef.current.add(vz.id);
+                    if (onReachVictory) onReachVictory();
                 }
             }
         }
