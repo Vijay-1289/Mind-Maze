@@ -33,8 +33,18 @@ export default function GamePage() {
 
         // Fetch all question data in one call for 3D display
         getAllQuestions(sessionId).then(data => {
+            if (data.error) {
+                console.warn('Session no longer exists in DB');
+                sessionStorage.clear();
+                navigate('/');
+                return;
+            }
             if (data.questions) setQuestions(data.questions);
-        }).catch(err => console.error('Failed to load questions:', err));
+        }).catch(err => {
+            console.error('Failed to load questions:', err);
+            sessionStorage.clear();
+            navigate('/');
+        });
     }, [sessionId, navigate]);
 
     // Socket events

@@ -6,14 +6,13 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import playerRoutes from './routes/playerRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import setupSocket from './socket/socketHandler.js';
 import { seedQuestions } from './seed.js';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const app = express();
 const httpServer = createServer(app);
@@ -69,14 +68,27 @@ const PORT = process.env.PORT || 3001;
 
 async function start() {
     try {
-        // Use in-memory MongoDB (no external MongoDB needed)
-        console.log('⏳ Starting in-memory MongoDB...');
-        const mongod = await MongoMemoryServer.create();
-        const uri = mongod.getUri();
-        console.log('✅ In-memory MongoDB started');
+        const uri = process.env.MONGODB_URI;
+        if (!uri) throw new Error("MONGODB_URI is not defined in the .env file");
 
-        await mongoose.connect(uri);
-        console.log('✅ Connected to MongoDB (in-memory)');
+        console.log('⏳ Connecting to MongoDB Atlas...');
+
+        // MongoDB Atlas connection options
+        const clientOptions = {
+            serverApi: {
+                version: '1',
+                strict: true,
+                deprecationErrors: true,
+            }
+        };
+
+        await mongoose.connect(uri, clientOptions);
+
+        // Send a ping to confirm a successful connection
+        if (mongoose.connection.db) {
+            await mongoose.connection.db.admin().command({ ping: 1 });
+            console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        }
 
         // Auto-seed questions on startup
         await seedQuestions();
