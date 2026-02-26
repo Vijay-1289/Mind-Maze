@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
+import * as THREE from 'three';
 import MazeScene from '../game/MazeScene';
 import HUD from '../components/HUD';
 import DeadEndOverlay from '../components/DeadEndOverlay';
@@ -134,7 +135,7 @@ export default function GamePage() {
     return (
         <div className="game-container">
             <Canvas
-                shadows
+                shadows={{ type: THREE.PCFShadowMap }}
                 camera={{ fov: 75, near: 0.1, far: 200, position: [0, 2, 2] }}
                 gl={{ antialias: true, alpha: false }}
                 onCreated={({ gl }) => { gl.setClearColor('#e8f5e9'); }}
