@@ -19,7 +19,7 @@ export function createMazeGraph(seed = 12345) {
     const rng = seededRandom(seed);
     const nodes = {};
     const edges = [];
-    const TOTAL_QUESTIONS = 30;
+    const TOTAL_QUESTIONS = 15;
     const correctPaths = {}; // Maps questionId -> correct path index
 
     function addNode(id, gx, gz, props) {
@@ -156,15 +156,15 @@ export function createMazeGraph(seed = 12345) {
 // Get all question node IDs in order
 export function getQuestionNodes() {
     const nodes = [];
-    for (let i = 1; i <= 30; i++) nodes.push(`q${i}`);
+    for (let i = 1; i <= 15; i++) nodes.push(`q${i}`);
     return nodes;
 }
 
-// Get difficulty for a question based on depth (1-5 scale over 30 questions)
+// Get difficulty for a question based on depth (1-5 scale over 15 questions)
 export function getDifficultyForDepth(depth) {
-    if (depth <= 6) return 1;
-    if (depth <= 12) return 2;
-    if (depth <= 18) return 3;
-    if (depth <= 24) return 4;
+    if (depth <= 3) return 1;
+    if (depth <= 6) return 2;
+    if (depth <= 9) return 3;
+    if (depth <= 12) return 4;
     return 5;
 }

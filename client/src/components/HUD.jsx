@@ -26,8 +26,7 @@ export default function HUD({ player }) {
                 <span className="value">{formatTime(elapsed)}</span>
             </div>
             <div className="hud-item">
-                <span className="label">DEPTH</span>
-                <span className="value">{player.depth || 0}/30</span>
+                <span className="value">{player.depth || 0}/15</span>
             </div>
         </div>
     );

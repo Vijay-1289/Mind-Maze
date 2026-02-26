@@ -29,10 +29,7 @@ export default function VictoryOverlay({ player }) {
             <motion.div className="victory-stats"
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.8 }}>
-                <div className="victory-stat">
-                    <div className="val">{player?.score || 0}</div>
-                    <div className="lbl">FINAL SCORE</div>
-                </div>
+
                 <div className="victory-stat">
                     <div className="val">{mins}:{secs.toString().padStart(2, '0')}</div>
                     <div className="lbl">TIME</div>

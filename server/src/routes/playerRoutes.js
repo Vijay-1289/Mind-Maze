@@ -20,6 +20,8 @@ router.post('/join', async (req, res) => {
         let player = await Player.findOne({ rollNumber, status: { $in: ['active', 'paused'] } });
         if (player) {
             // Resume existing session
+            await assignQuestionsToPlayer(player.sessionId, player.questionSeed);
+
             const mazeData = createMazeGraph(player.questionSeed);
             const questionData = getQuestionForNode(player.sessionId, player.currentNode);
             return res.json({
@@ -70,6 +72,7 @@ router.get('/state/:sessionId', async (req, res) => {
     try {
         const player = await Player.findOne({ sessionId: req.params.sessionId });
         if (!player) return res.status(404).json({ error: 'Session not found' });
+        await assignQuestionsToPlayer(player.sessionId, player.questionSeed);
 
         const questionNodes = getQuestionNodes();
         const currentQuestion = questionNodes.includes(player.currentNode)
@@ -93,6 +96,7 @@ router.get('/questions/:sessionId', async (req, res) => {
     try {
         const player = await Player.findOne({ sessionId: req.params.sessionId });
         if (!player) return res.status(404).json({ error: 'Session not found' });
+        await assignQuestionsToPlayer(player.sessionId, player.questionSeed);
 
         const questionNodes = getQuestionNodes();
         const allQuestions = {};
@@ -119,6 +123,7 @@ router.post('/reach', async (req, res) => {
         const player = await Player.findOne({ sessionId });
         if (!player) return res.status(404).json({ error: 'Session not found' });
         if (player.status !== 'active') return res.status(403).json({ error: 'Game not active' });
+        await assignQuestionsToPlayer(player.sessionId, player.questionSeed);
 
         // Check if it's a valid question node
         const questionNodes = getQuestionNodes();
@@ -157,6 +162,7 @@ router.post('/answer', answerLimiter, checkSuspiciousActivity, async (req, res) 
         const player = await Player.findOne({ sessionId });
         if (!player) return res.status(404).json({ error: 'Session not found' });
         if (player.status !== 'active') return res.status(403).json({ error: 'Game is not active' });
+        await assignQuestionsToPlayer(player.sessionId, player.questionSeed);
 
         // Check if already answered this node correctly
         const alreadyAnswered = player.answeredNodes.find(a => a.nodeId === nodeId && a.correct);
@@ -183,7 +189,7 @@ router.post('/answer', answerLimiter, checkSuspiciousActivity, async (req, res) 
                 player.currentNode = nextEdge.to;
 
                 // Check if they reached the end of the maze
-                if (player.depth >= 30) {
+                if (player.depth >= 15) {
                     player.status = 'finished';
                     player.completedAt = new Date();
                     player.calculateScore();

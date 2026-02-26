@@ -160,7 +160,6 @@ export default function GamePage() {
                 <div className="victory-overlay">
                     <h1 className="victory-title">🏆 WINNER DECLARED 🏆</h1>
                     <p style={{ fontSize: '1.5rem', marginTop: '1rem' }}>{winner.name}</p>
-                    <p style={{ color: 'var(--text-secondary)' }}>Score: {winner.score}</p>
                 </div>
             )}
             {paused && (
