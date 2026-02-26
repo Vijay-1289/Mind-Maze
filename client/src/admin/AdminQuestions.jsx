@@ -7,12 +7,7 @@ export default function AdminQuestions({ token }) {
     const [editing, setEditing] = useState(null);
     const [formData, setFormData] = useState({
         text: '',
-        options: [
-            { text: '', obfuscated: '' },
-            { text: '', obfuscated: '' },
-            { text: '', obfuscated: '' },
-            { text: '', obfuscated: '' }
-        ],
+        options: ['', '', '', ''],
         correctIndex: 0,
         difficulty: 1,
         category: 'brain-teaser'
@@ -65,12 +60,7 @@ export default function AdminQuestions({ token }) {
     const openNewQuestion = () => {
         setFormData({
             text: '',
-            options: [
-                { text: '', obfuscated: '' },
-                { text: '', obfuscated: '' },
-                { text: '', obfuscated: '' },
-                { text: '', obfuscated: '' }
-            ],
+            options: ['', '', '', ''],
             correctIndex: 0,
             difficulty: 1,
             category: 'brain-teaser'
@@ -113,16 +103,10 @@ export default function AdminQuestions({ token }) {
                                     onChange={() => setFormData({ ...formData, correctIndex: i })}
                                     style={{ transform: 'scale(1.5)', margin: '0 10px' }}
                                 />
-                                <input required placeholder={`Option ${i + 1} Actual`} value={opt.text}
+                                <input required placeholder={`Option ${i + 1}`} value={opt}
                                     onChange={e => {
                                         const newOpts = [...formData.options];
-                                        newOpts[i].text = e.target.value;
-                                        setFormData({ ...formData, options: newOpts });
-                                    }} style={{ flex: 1, padding: '8px' }} />
-                                <input required placeholder={`Obfuscated (Path Label)`} value={opt.obfuscated}
-                                    onChange={e => {
-                                        const newOpts = [...formData.options];
-                                        newOpts[i].obfuscated = e.target.value;
+                                        newOpts[i] = e.target.value;
                                         setFormData({ ...formData, options: newOpts });
                                     }} style={{ flex: 1, padding: '8px' }} />
                             </div>

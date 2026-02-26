@@ -1,302 +1,362 @@
 [
     {
-        text: "What gets wetter the more it dries?",
-        options: [
-            { text: "Cloud", obfuscated: "Floating vapor mass" },
-            { text: "Towel", obfuscated: "Fabric absorption tool" },
-            { text: "Ocean", obfuscated: "Vast saline body" },
-            { text: "Rain", obfuscated: "Falling sky droplets" }
+        "id": 1,
+        "text": "What does NaN === NaN return in JavaScript?",
+        "options": [
+            "true",
+            "false",
+            "undefined"
         ],
-        correctIndex: 1, difficulty: 1, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has keys but can't open locks?",
-        options: [
-            { text: "Map", obfuscated: "Navigation chart" },
-            { text: "Piano", obfuscated: "Musical instrument" },
-            { text: "Keyboard", obfuscated: "Input device" },
-            { text: "Chest", obfuscated: "Storage container" }
+        "id": 2,
+        "text": "Which of these is NOT a primitive type in JavaScript?",
+        "options": [
+            "string",
+            "object",
+            "boolean"
         ],
-        correctIndex: 1, difficulty: 1, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "The more you take, the more you leave behind. What are they?",
-        options: [
-            { text: "Footsteps", obfuscated: "Ground impressions" },
-            { text: "Memories", obfuscated: "Mental recordings" },
-            { text: "Regrets", obfuscated: "Past sorrows" },
-            { text: "Time", obfuscated: "Eternal flow" }
+        "id": 3,
+        "text": "What is the output of: typeof null ?",
+        "options": [
+            "null",
+            "object",
+            "undefined"
         ],
-        correctIndex: 0, difficulty: 1, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has an eye but cannot see?",
-        options: [
-            { text: "Camera", obfuscated: "Light capture box" },
-            { text: "Needle", obfuscated: "Thread guide tool" },
-            { text: "Storm", obfuscated: "Weather vortex" },
-            { text: "Potato", obfuscated: "Underground tuber" }
+        "id": 4,
+        "text": "Which data structure works on FIFO principle?",
+        "options": [
+            "Stack",
+            "Queue",
+            "Tree"
         ],
-        correctIndex: 1, difficulty: 1, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What runs but never walks?",
-        options: [
-            { text: "Cheetah", obfuscated: "Spotted predator" },
-            { text: "River", obfuscated: "Flowing water path" },
-            { text: "Clock", obfuscated: "Time display" },
-            { text: "Wind", obfuscated: "Moving air mass" }
+        "id": 5,
+        "text": "Which data structure works on LIFO principle?",
+        "options": [
+            "Queue",
+            "Stack",
+            "Heap"
         ],
-        correctIndex: 1, difficulty: 1, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has a heart that doesn't beat?",
-        options: [
-            { text: "Robot", obfuscated: "Mechanical being" },
-            { text: "Stone", obfuscated: "Mineral solid" },
-            { text: "Artichoke", obfuscated: "Layered vegetable" },
-            { text: "Statue", obfuscated: "Carved figure" }
+        "id": 6,
+        "text": "Which time complexity is fastest?",
+        "options": [
+            "O(n)",
+            "O(log n)",
+            "O(n^2)"
         ],
-        correctIndex: 2, difficulty: 2, category: "wordplay"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What can travel around the world while staying in one spot?",
-        options: [
-            { text: "Stamp", obfuscated: "Postal adhesive" },
-            { text: "Moon", obfuscated: "Night sphere" },
-            { text: "Sun", obfuscated: "Day star" },
-            { text: "Wind", obfuscated: "Air current" }
+        "id": 7,
+        "text": "Which keyword is used to define a constant in JavaScript?",
+        "options": [
+            "var",
+            "let",
+            "const"
         ],
-        correctIndex: 0, difficulty: 2, category: "lateral-thinking"
+        "correctIndex": 2,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What gets bigger the more you take away?",
-        options: [
-            { text: "Debt", obfuscated: "Financial burden" },
-            { text: "Hole", obfuscated: "Empty cavity" },
-            { text: "Shadow", obfuscated: "Dark projection" },
-            { text: "Fear", obfuscated: "Deep anxiety" }
+        "id": 8,
+        "text": "Which sorting algorithm has average time complexity O(n log n)?",
+        "options": [
+            "Bubble Sort",
+            "Merge Sort",
+            "Selection Sort"
         ],
-        correctIndex: 1, difficulty: 2, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has a neck but no head?",
-        options: [
-            { text: "Bottle", obfuscated: "Liquid container" },
-            { text: "Shirt", obfuscated: "Upper garment" },
-            { text: "Guitar", obfuscated: "String instrument" },
-            { text: "Lamp", obfuscated: "Light source" }
+        "id": 9,
+        "text": "Which HTTP method is idempotent?",
+        "options": [
+            "GET",
+            "POST",
+            "PATCH"
         ],
-        correctIndex: 0, difficulty: 2, category: "brain-teaser"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What can you catch but not throw?",
-        options: [
-            { text: "Cold", obfuscated: "Common ailment" },
-            { text: "Shadow", obfuscated: "Light absence" },
-            { text: "Wind", obfuscated: "Air movement" },
-            { text: "Light", obfuscated: "Photon stream" }
+        "id": 10,
+        "text": "Which symbol is used for strict equality in JavaScript?",
+        "options": [
+            "==",
+            "===",
+            "="
         ],
-        correctIndex: 0, difficulty: 2, category: "wordplay"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What goes up but never comes down?",
-        options: [
-            { text: "Smoke", obfuscated: "Combustion vapors" },
-            { text: "Balloon", obfuscated: "Inflated sphere" },
-            { text: "Age", obfuscated: "Life counter" },
-            { text: "Helium", obfuscated: "Noble element" }
+        "id": 11,
+        "text": "Which data structure uses key-value pairs?",
+        "options": [
+            "Array",
+            "Object",
+            "Stack"
         ],
-        correctIndex: 2, difficulty: 2, category: "logical-illusion"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has many teeth but cannot bite?",
-        options: [
-            { text: "Comb", obfuscated: "Hair organizer" },
-            { text: "Shark", obfuscated: "Ocean predator" },
-            { text: "Saw", obfuscated: "Cutting tool" },
-            { text: "Gear", obfuscated: "Rotating mechanism" }
+        "id": 12,
+        "text": "Which algorithm technique divides problem into subproblems and combines results?",
+        "options": [
+            "Greedy",
+            "Divide and Conquer",
+            "Backtracking"
         ],
-        correctIndex: 0, difficulty: 2, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has a ring but no finger?",
-        options: [
-            { text: "Tree", obfuscated: "Tall plant" },
-            { text: "Phone", obfuscated: "Communication device" },
-            { text: "Planet", obfuscated: "Orbital body" },
-            { text: "Cup", obfuscated: "Drink vessel" }
+        "id": 13,
+        "text": "Which loop runs at least once regardless of condition?",
+        "options": [
+            "while",
+            "for",
+            "do-while"
         ],
-        correctIndex: 1, difficulty: 3, category: "wordplay"
+        "correctIndex": 2,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What begins with T, ends with T, and has T in it?",
-        options: [
-            { text: "Tent", obfuscated: "Camping shelter" },
-            { text: "Test", obfuscated: "Evaluation form" },
-            { text: "Teapot", obfuscated: "Brew container" },
-            { text: "Treat", obfuscated: "Sweet reward" }
+        "id": 14,
+        "text": "Which symbol is used for single-line comments in Python?",
+        "options": [
+            "//",
+            "#",
+            "/*"
         ],
-        correctIndex: 2, difficulty: 3, category: "wordplay"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What is always in front of you but can't be seen?",
-        options: [
-            { text: "Air", obfuscated: "Invisible atmosphere" },
-            { text: "Future", obfuscated: "Unwritten timeline" },
-            { text: "Shadow", obfuscated: "Dark follower" },
-            { text: "Hope", obfuscated: "Inner optimism" }
+        "id": 15,
+        "text": "Which data structure is used in recursion internally?",
+        "options": [
+            "Queue",
+            "Stack",
+            "Heap"
         ],
-        correctIndex: 1, difficulty: 3, category: "psychological-trap"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has one head, one foot, and four legs?",
-        options: [
-            { text: "Bed", obfuscated: "Sleeping platform" },
-            { text: "Chair", obfuscated: "Sitting furniture" },
-            { text: "Table", obfuscated: "Flat surface" },
-            { text: "Horse", obfuscated: "Hooved animal" }
+        "id": 16,
+        "text": "Which of these is a NoSQL database?",
+        "options": [
+            "MongoDB",
+            "MySQL",
+            "PostgreSQL"
         ],
-        correctIndex: 0, difficulty: 3, category: "brain-teaser"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has branches but no fruit, trunk, or leaves?",
-        options: [
-            { text: "Library", obfuscated: "Knowledge center" },
-            { text: "River", obfuscated: "Water channel" },
-            { text: "Bank", obfuscated: "Financial institution" },
-            { text: "Road", obfuscated: "Paved pathway" }
+        "id": 17,
+        "text": "Which operator spreads elements in JavaScript?",
+        "options": [
+            "...",
+            "::",
+            "=>"
         ],
-        correctIndex: 2, difficulty: 3, category: "lateral-thinking"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What comes once in a minute, twice in a moment, but never in a thousand years?",
-        options: [
-            { text: "Time", obfuscated: "Duration concept" },
-            { text: "Second", obfuscated: "Brief instant" },
-            { text: "Letter M", obfuscated: "Thirteenth symbol" },
-            { text: "Blink", obfuscated: "Eye flutter" }
+        "id": 18,
+        "text": "Which traversal visits Left, Root, Right?",
+        "options": [
+            "Preorder",
+            "Inorder",
+            "Postorder"
         ],
-        correctIndex: 2, difficulty: 3, category: "logical-illusion"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What can fill a room but takes up no space?",
-        options: [
-            { text: "Sound", obfuscated: "Vibration waves" },
-            { text: "Light", obfuscated: "Electromagnetic glow" },
-            { text: "Air", obfuscated: "Gas mixture" },
-            { text: "Heat", obfuscated: "Thermal energy" }
+        "id": 19,
+        "text": "Which symbol is used for arrow functions in JavaScript?",
+        "options": [
+            "=>",
+            "->",
+            "::"
         ],
-        correctIndex: 1, difficulty: 3, category: "brain-teaser"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has hands but cannot clap?",
-        options: [
-            { text: "Statue", obfuscated: "Stone figure" },
-            { text: "Clock", obfuscated: "Time keeper" },
-            { text: "Robot", obfuscated: "Machine being" },
-            { text: "Mannequin", obfuscated: "Display dummy" }
+        "id": 20,
+        "text": "Which CSS property changes text color?",
+        "options": [
+            "background",
+            "font-style",
+            "color"
         ],
-        correctIndex: 1, difficulty: 4, category: "brain-teaser"
+        "correctIndex": 2,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What gets sharper the more you use it?",
-        options: [
-            { text: "Knife", obfuscated: "Cutting blade" },
-            { text: "Brain", obfuscated: "Thinking organ" },
-            { text: "Pencil", obfuscated: "Writing stick" },
-            { text: "Saw", obfuscated: "Toothed cutter" }
+        "id": 21,
+        "text": "Which Git command stages changes?",
+        "options": [
+            "git add",
+            "git push",
+            "git clone"
         ],
-        correctIndex: 1, difficulty: 4, category: "psychological-trap"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What can break without being touched?",
-        options: [
-            { text: "Glass", obfuscated: "Transparent solid" },
-            { text: "Promise", obfuscated: "Spoken commitment" },
-            { text: "Bone", obfuscated: "Skeletal part" },
-            { text: "Silence", obfuscated: "Sound absence" }
+        "id": 22,
+        "text": "Which SQL keyword filters rows?",
+        "options": [
+            "WHERE",
+            "SELECT",
+            "INSERT"
         ],
-        correctIndex: 1, difficulty: 4, category: "psychological-trap"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has cities, rivers, and mountains but no houses?",
-        options: [
-            { text: "Globe", obfuscated: "Spherical model" },
-            { text: "Map", obfuscated: "Flat representation" },
-            { text: "Atlas", obfuscated: "Bound charts" },
-            { text: "Painting", obfuscated: "Canvas art" }
+        "id": 23,
+        "text": "Which structure prevents duplicate values?",
+        "options": [
+            "Array",
+            "Set",
+            "Stack"
         ],
-        correctIndex: 1, difficulty: 4, category: "lateral-thinking"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What is so fragile that saying its name breaks it?",
-        options: [
-            { text: "Silence", obfuscated: "Absolute quiet" },
-            { text: "Glass", obfuscated: "See-through solid" },
-            { text: "Trust", obfuscated: "Faith bond" },
-            { text: "Echo", obfuscated: "Sound reflection" }
+        "id": 24,
+        "text": "Which JavaScript method converts JSON string to object?",
+        "options": [
+            "JSON.parse()",
+            "JSON.stringify()",
+            "JSON.object()"
         ],
-        correctIndex: 0, difficulty: 4, category: "psychological-trap"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What goes through cities and fields but never moves?",
-        options: [
-            { text: "Road", obfuscated: "Travel surface" },
-            { text: "Wind", obfuscated: "Breeze force" },
-            { text: "River", obfuscated: "Flowing current" },
-            { text: "Train", obfuscated: "Rail vehicle" }
+        "id": 25,
+        "text": "Which principle hides implementation details?",
+        "options": [
+            "Encapsulation",
+            "Inheritance",
+            "Polymorphism"
         ],
-        correctIndex: 0, difficulty: 4, category: "brain-teaser"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has legs but doesn't walk?",
-        options: [
-            { text: "Chair", obfuscated: "Rest furniture" },
-            { text: "Dog", obfuscated: "Loyal companion" },
-            { text: "Table", obfuscated: "Elevated surface" },
-            { text: "Shadow", obfuscated: "Dark outline" }
+        "id": 26,
+        "text": "Which data structure is best for implementing BFS?",
+        "options": [
+            "Stack",
+            "Queue",
+            "Tree"
         ],
-        correctIndex: 0, difficulty: 5, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What can't talk but will reply when spoken to?",
-        options: [
-            { text: "Mirror", obfuscated: "Reflective glass" },
-            { text: "Echo", obfuscated: "Repeated sound" },
-            { text: "Phone", obfuscated: "Signal device" },
-            { text: "Book", obfuscated: "Written pages" }
+        "id": 27,
+        "text": "Which HTML tag is used to create a hyperlink?",
+        "options": [
+            "<a>",
+            "<link>",
+            "<href>"
         ],
-        correctIndex: 1, difficulty: 5, category: "brain-teaser"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What disappears the moment you say its name?",
-        options: [
-            { text: "Silence", obfuscated: "Void of noise" },
-            { text: "Shadow", obfuscated: "Darkness form" },
-            { text: "Dream", obfuscated: "Sleep vision" },
-            { text: "Secret", obfuscated: "Hidden truth" }
+        "id": 28,
+        "text": "Which operator is used for modulo?",
+        "options": [
+            "/",
+            "%",
+            "*"
         ],
-        correctIndex: 0, difficulty: 5, category: "psychological-trap"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What has a bottom at the top?",
-        options: [
-            { text: "Legs", obfuscated: "Walking limbs" },
-            { text: "Mountain", obfuscated: "Tall peak" },
-            { text: "Letter B", obfuscated: "Second alphabet" },
-            { text: "Bottle", obfuscated: "Glass vessel" }
+        "id": 29,
+        "text": "Which lifecycle method runs after first render in React?",
+        "options": [
+            "componentDidMount",
+            "render",
+            "useState"
         ],
-        correctIndex: 2, difficulty: 5, category: "logical-illusion"
+        "correctIndex": 0,
+        "difficulty": 1,
+        "category": "brain-teaser"
     },
     {
-        text: "What gets shorter as it grows older?",
-        options: [
-            { text: "Candle", obfuscated: "Wax light source" },
-            { text: "Pencil", obfuscated: "Graphite writer" },
-            { text: "Shadow", obfuscated: "Sun projection" },
-            { text: "Life", obfuscated: "Existence span" }
+        "id": 30,
+        "text": "Which keyword creates a class in JavaScript?",
+        "options": [
+            "function",
+            "class",
+            "object"
         ],
-        correctIndex: 0, difficulty: 5, category: "brain-teaser"
+        "correctIndex": 1,
+        "difficulty": 1,
+        "category": "brain-teaser"
     }
 ]

@@ -2,10 +2,7 @@ import mongoose from 'mongoose';
 
 const questionSchema = new mongoose.Schema({
     text: { type: String, required: true },
-    options: [{
-        text: { type: String, required: true },
-        obfuscated: { type: String, required: true }
-    }],
+    options: [{ type: String }],
     correctIndex: { type: Number, required: true, min: 0, max: 3 },
     difficulty: { type: Number, required: true, min: 1, max: 5, default: 1 },
     category: {

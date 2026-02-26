@@ -203,10 +203,10 @@ router.post('/questions/upload', adminAuth, upload.single('file'), async (req, r
                         questions.push({
                             text: row.text || row.question,
                             options: [
-                                { text: row.option1 || row.a, obfuscated: row.obf1 || row.oa },
-                                { text: row.option2 || row.b, obfuscated: row.obf2 || row.ob },
-                                { text: row.option3 || row.c, obfuscated: row.obf3 || row.oc },
-                                { text: row.option4 || row.d, obfuscated: row.obf4 || row.od || row.oc }
+                                row.option1 || row.a,
+                                row.option2 || row.b,
+                                row.option3 || row.c,
+                                row.option4 || row.d || row.oc
                             ],
                             correctIndex: parseInt(row.correct || row.correctIndex || '0'),
                             difficulty: parseInt(row.difficulty || '1'),

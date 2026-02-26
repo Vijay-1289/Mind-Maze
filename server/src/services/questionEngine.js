@@ -104,11 +104,11 @@ export function getQuestionForNode(sessionId, nodeId) {
     if (!mapping || !mapping[nodeId]) return null;
 
     const data = mapping[nodeId];
-    // Build path labels using obfuscated option text
+    // Build path labels using option text directly
     const pathLabels = {};
     for (let i = 0; i < 3; i++) {
         const optionIdx = data.pathMapping[i];
-        pathLabels[i] = data.options[optionIdx]?.obfuscated || data.options[optionIdx]?.text || `Path ${i + 1}`;
+        pathLabels[i] = data.options[optionIdx] || `Path ${i + 1}`;
     }
 
     return {
