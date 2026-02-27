@@ -1,8 +1,20 @@
 {
   "name": "mindtrap-maze",
   "version": "1.0.0",
-  "description": "MindTrap Maze – Multiplayer Fest Edition",
   "private": true,
+  "description": "MindTrap Maze – Multiplayer Fest Edition",
+  "homepage": "https://github.com/Vijay-1289/Mind-Maze#readme",
+  "bugs": {
+    "url": "https://github.com/Vijay-1289/Mind-Maze/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vijay-1289/Mind-Maze.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "fixed_maze.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm run dev",
@@ -11,11 +23,17 @@
     "seed": "cd server && node src/seed.js",
     "build": "cd client && npm run build"
   },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.4",
+    "dotenv": "^17.3.1",
+    "framer-motion": "^12.34.3",
+    "mongoose": "^9.2.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.1",
+    "vite": "^7.3.1"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "dependencies": {
-    "dotenv": "^17.3.1",
-    "mongoose": "^9.2.2"
   }
 }
